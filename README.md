@@ -5,7 +5,7 @@ fix the penetration bugs between two arcs, avoid numerical error when colliding 
 Adding 2 new maps to the pool (map5&6).
 
 
-<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/map5.png"  style="width:100px" > 
+<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/map5.png"  width=500 > 
 
 
 
@@ -14,7 +14,7 @@ Adding 2 new maps to the pool (map5&6).
 
 ## Environment
 
-<img src=https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/olympics%20running.gif width = 50>
+<img src=https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/olympics%20running.gif width = 600>
 
 check details in Jidi Competition [RLChina2021智能体竞赛](http://www.jidiai.cn/compete_detail?compete=12)
 
