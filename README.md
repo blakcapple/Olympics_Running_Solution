@@ -5,7 +5,10 @@ fix the penetration bugs between two arcs, avoid numerical error when colliding 
 Adding 2 new maps to the pool (map5&6).
 
 
-<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/map5.png"  width=500 > 
+<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/map5.png"  width=300 > 
+
+<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/map6.png"  width=300 > 
+
 
 
 
@@ -76,7 +79,7 @@ This is for now a beta version and we intend to add more sports scenario, stay t
 
 By default parameters, the total reward of training is shown below.
 
-<img src=https://github.com/jidiai/Competition_Olympics-Running/blob/main/assets/PPO%20map1%20training%20(run1).png>
+<img src=https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/PPO%20map1%20training%20(run1).png>
 
 You can also locally evaluate your trained model by executing:
 
@@ -84,7 +87,7 @@ You can also locally evaluate your trained model by executing:
 
 or specifying the map number (--map=1).
 
-<img src="https://github.com/jidiai/Competition_Olympics-Running/blob/main/assets/evaluation_local_results.png">
+<img src="https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/evaluation_local_results.png">
 
 
 ## How to test submission
