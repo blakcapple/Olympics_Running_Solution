@@ -2,164 +2,84 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from rl_trainer.algo.cnn import CNNLayer
 
-class CNN_encoder(nn.Module):
-    def __init__(self):
-        super(CNN_encoder, self).__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(4, 8, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.MaxPool2d(4, 2),
-            nn.Conv2d(8, 8, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.MaxPool2d(4,2),
-            nn.Flatten()
-        )
-
-    def forward(self, view_state):
-        # [batch, 128]
-        x = self.net(view_state)
-        return x
-
-device = 'cpu'
-
-class Actor(nn.Module):
-    def __init__(self, state_space, action_space, hidden_size=64, cnn=False):
-        super(Actor, self).__init__()
-        self.is_cnn = cnn
-        if self.is_cnn:
-            self.encoder = CNN_encoder().to(device)
-        self.linear_in = nn.Linear(state_space, hidden_size)
-        self.action_head = nn.Linear(hidden_size, action_space)
-
-    def forward(self, x):
-        if self.is_cnn:
-            x = self.encoder(x)
-        x = F.relu(self.linear_in(x))
-        action_prob = F.softmax(self.action_head(x), dim=1)
-        return action_prob
+def mlp(sizes, activation, output_activation=nn.Identity):
+    layers = []
+    for j in range(len(sizes)-1):
+        act = activation if j < len(sizes)-2 else output_activation
+        layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
+    return nn.Sequential(*layers)
 
 
-class Critic(nn.Module):
-    def __init__(self, state_space, hidden_size=64, cnn=False):
-        super(Critic, self).__init__()
-        self.is_cnn = cnn
-        if self.is_cnn:
-            self.encoder = CNN_encoder().to(device)  # 用GPU计算
-        self.linear_in = nn.Linear(state_space, hidden_size)
-        self.state_value = nn.Linear(hidden_size, 1)
+class CNNCategoricalActor(nn.Module):
 
-    def forward(self, x):
-        if self.is_cnn:
-            x = self.encoder(x)
-        x = F.relu(self.linear_in(x))
-        value = self.state_value(x)
-        return value
+    def __init__(self, input_shape, act_dim, activation):
 
-class CNN_Actor(nn.Module):
-    def __init__(self, state_space, action_space, hidden_size = 64):
-        super(CNN_Actor, self).__init__()
+        self.input_shape = input_shape
+        self.act_dim = act_dim 
+        self.cnn_layer = CNNLayer(input_shape)
+        self.linear_layer = mlp([64]+[256]+[act_dim], activation)
+        self.logits_net = nn.Sequential(self.cnn_layer, self.linear_layer)
+        
+    def distribution(self, obs):
+        logits = self.logits_net(obs)
+        return Categorical(logits=logits)
 
-        # self.conv1 = nn.Conv2d(in_channels = 8, out_channels=32, kernel_size = 4, stride = 2)
-        # self.conv2 = nn.Conv2d(in_channels = 32, out_channels=64, kernel_size = 3, stride = 1)
-        # self.flatten = nn.Flatten()
-        self.net = Net = nn.Sequential(
-            nn.Conv2d(in_channels = 8, out_channels=32, kernel_size = 4, stride = 2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(in_channels = 32, out_channels=64, kernel_size = 3, stride = 1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.Flatten()
-        )
+    def log_prob_from_distribution(self, pi, act):
+        return pi.log_prob(act)
 
-        self.linear1 = nn.Linear(256, 64)
-        self.linear2 = nn.Linear(64, action_space)
+    def forward(self, obs):
+        prob = self.logits_net(obs)
 
-    def forward(self, x):
-        x = self.net(x)
-        x = torch.relu(self.linear1(x))
-        action_prob = F.softmax(self.linear2(x), dim = -1)
-        return action_prob
+        return prob
 
-class CNN_Critic(nn.Module):
-    def __init__(self, state_space, hidden_size = 64):
-        super(CNN_Critic, self).__init__()
+class CNNCritic(nn.Module):
 
-        self.net = Net = nn.Sequential(
-            nn.Conv2d(in_channels = 8, out_channels=32, kernel_size = 4, stride = 2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(in_channels = 32, out_channels=64, kernel_size = 3, stride = 1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.Flatten()
-        )
+    def __init__(self, input_shape, activation):
 
-        self.linear1 = nn.Linear(256, 64)
-        self.linear2 = nn.Linear(64, 1)
+        self.input_shape = input_shape
+        self.cnn_layer = CNNLayer(input_shape)
+        self.linear_layer = mlp([64]+[256]+[1], activation)
+        self.v_net = nn.Sequential(self.cnn_layer, self.linear_layer)
 
-    def forward(self, x):
-        x = self.net(x)
-        x = torch.relu(self.linear1(x))
-        x = self.linear2(x)
-        return x
+    def forward(self, obs):
+
+        return torch.squeeze(self.v_net(obs), -1)
+
+class CNNActorCritic(nn.Module):
+
+    def __init__(self, state_shape, action_shape, activation=nn.ReLU):
+        
+        self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
+
+        self.v = CNNCritic(state_shape, activation)
+    
+    def step(self, obs):
+
+        with torch.no_grad():
+            pi = self.pi.distribution(obs)
+            a = pi.sample()
+            logp_a = self.pi.log_prob_from_distribution(pi, a)
+            v = self.v(obs)
+
+        return a.detach().numpy(), v.detach().numpy(), logp_a.detach().numpy()
+
+    def act(self, obs, phase='train'):
+        if phase == 'test':
+            prob = self.pi(obs)
+            return torch.argmax(prob).item()
+        elif phase == 'train':
+            return self.step(obs)[0]
+        else:
+            raise NotImplementedError
 
 
 
-class CNN_CategoricalActor(nn.Module):
-    def __init__(self, state_space, action_space, hidden_size = 64):
-        super(CNN_CategoricalActor, self).__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels = 8, out_channels=32, kernel_size = 4, stride = 2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(in_channels = 32, out_channels=32, kernel_size = 3, stride = 1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.Flatten()
-        )
 
-        self.linear1 = nn.Linear(128, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, action_space)
 
-    def forward(self, x):
-        x = self.net(x)
-        x = F.relu(self.linear1(x))
-        action_prob = F.softmax(self.linear2(x), dim = -1)
-        c = Categorical(action_prob)
-        sampled_action = c.sample()
-        greedy_action = torch.argmax(action_prob)
-        return sampled_action, action_prob, greedy_action
 
-class CNN_Critic2(nn.Module):
-    def __init__(self, state_space, action_space, hidden_size=64):
-        super(CNN_Critic2, self).__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels = 8, out_channels=32, kernel_size = 4, stride = 2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(in_channels = 32, out_channels=32, kernel_size = 3, stride = 1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.Flatten()
-        )
-        self.linear1 = nn.Linear(128, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, action_space)
-
-    def forward(self, x):
-        x = self.net(x)
-        x = F.relu(self.linear1(x))
-        return self.linear2(x)
-
+    
 
 
 
