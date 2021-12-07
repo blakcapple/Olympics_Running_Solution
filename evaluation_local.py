@@ -29,9 +29,9 @@ def get_join_actions(state, algo_list):
             joint_actions.append([[driving_force], [turing_angle]])
 
         elif algo_list[agent_idx] == 'rl':
-            obs = state[agent_idx]['obs'].flatten()
+            obs = state[agent_idx]['obs']
             actions_raw = rl_agent.choose_action(obs)
-            actions = actions_map[actions_raw]
+            actions = actions_map[actions_raw.item()]
             joint_actions.append([[actions[0]], [actions[1]]])
 
     return joint_actions
