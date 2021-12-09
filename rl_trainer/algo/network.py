@@ -1,56 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Normal
 from rl_trainer.algo.cnn import CNNLayer
 import os 
-## CNN 
-def init(module, weight_init, bias_init, gain=1):
-    weight_init(module.weight.data, gain=gain)
-    bias_init(module.bias.data)
-    return module
-
-class Flatten(nn.Module):
-    def forward(self, x):
-        return x.view(x.size(0), -1)
-
-class CNNLayer(nn.Module):
-
-    out_channel = 32
-    hidden_size = 64
-    kernel_size = 3
-    stride = 1
-    use_Relu = True
-    use_orthogonal = True
-    
-    def __init__(self, state_shape):
-        
-        super().__init__()
-        
-        active_func = [nn.Tanh(), nn.ReLU()][self.use_Relu]
-        init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self.use_orthogonal]
-        gain = nn.init.calculate_gain(['tanh', 'relu'][self.use_Relu])
-        input_channel = state_shape[0]
-        input_width = state_shape[1]
-        input_height = state_shape[2]
-        def init_(m):
-            return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain=gain)
-        cnn_out_size = self.out_channel * (input_width - self.kernel_size + self.stride) * (input_height - self.kernel_size + self.stride)
-        self.cnn = nn.Sequential(
-            init_(nn.Conv2d(in_channels=input_channel,
-                            out_channels=self.out_channel,
-                            kernel_size=self.kernel_size,
-                            stride=self.stride)
-                  ),
-            active_func,
-            Flatten(),
-            init_(nn.Linear(cnn_out_size,
-                            self.hidden_size)),
-                            active_func,
-                            )
-    def forward(self, input):
-        output = self.cnn(input)
-        return output
+import numpy as np 
 
 def mlp(sizes, activation, output_activation=nn.Identity):
     layers = []
@@ -59,7 +13,48 @@ def mlp(sizes, activation, output_activation=nn.Identity):
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
     return nn.Sequential(*layers)
 
-## RL MODEL
+class CNNGaussianActor(nn.Module):
+    
+    def __init__(self, input_shape, act_dim, activation):
+        super().__init__()
+        self.input_shape = input_shape
+        self.act_dim = act_dim 
+        self.cnn_layer = CNNLayer(input_shape)
+        self.linear_layer = mlp([64]+[256]+[act_dim], activation, output_activation=nn.Tanh)
+        self.log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
+        self.mu_net = nn.Sequential(self.cnn_layer, self.linear_layer)
+        
+    def distribution(self, obs):
+        mu = self.mu_net(obs)
+        std = torch.exp(self.log_std)
+        return Normal(mu, std)
+
+    def log_prob_from_distribution(self, pi, act):
+        return pi.log_prob(act).sum(axis=-1)    # Last axis sum needed for Torch Normal distribution
+
+    def forward(self, obs, act=None):
+        # Produce action distributions for given observations, and 
+        # optionally compute the log likelihood of given actions under
+        # those distributions.
+        pi = self.distribution(obs)
+        logp_a = None
+        if act is not None:
+            logp_a = self.log_prob_from_distribution(pi, act.view(-1))
+        return pi, logp_a
+
+    def save_model(self, pth):
+        torch.save(self.state_dict(), pth)
+
+    def load_model(self, pth):
+        self.load_state_dict(torch.load(pth))
+
+    def eval(self, obs):
+        """
+        return the best action
+        """
+        mu = self.mu_net(obs).view(-1)
+        return mu.detach().cpu().numpy()
+
 class CNNCategoricalActor(nn.Module):
 
     def __init__(self, input_shape, act_dim, activation):
@@ -122,10 +117,14 @@ class CNNCritic(nn.Module):
 
 class CNNActorCritic(nn.Module):
     
-    def __init__(self, state_shape, action_shape, activation=nn.ReLU):
+    def __init__(self, state_shape, action_shape, activation=nn.ReLU, type='categorical'):
         super().__init__()
-        self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
 
+        if type == 'categorical':
+            self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
+        elif type == 'gaussian':
+            self.pi = CNNGaussianActor(state_shape, action_shape, activation)
+            
         self.v = CNNCritic(state_shape, activation)
     
     def step(self, obs):

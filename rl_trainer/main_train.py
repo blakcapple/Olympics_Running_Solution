@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 base_dir = str(Path(__file__).resolve().parent.parent)
@@ -25,20 +26,21 @@ def main(args):
     np.random.seed(args.seed)
     env = make(args.game_name)
     state_shape = [1, 25, 25]
-    action_shape = 35
+    action_shape = 2
     device = 'cpu' # spinning up mpi tools only suppor cpu 
     logger_kwargs = setup_logger_kwargs(args.algo, args.seed, data_dir=args.save_dir)
     logger = EpochLogger(**logger_kwargs)
     policy = PPO(state_shape, action_shape, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
                 logger=logger, clip_ratio=args.clip_ratio, train_pi_iters=args.train_pi_iters, 
-                train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, max_grad_norm=args.max_grad_norm)
+                train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, 
+                max_grad_norm=args.max_grad_norm, type='gaussian')
     sync_params(policy.ac) # Sync params across processes
     logger.setup_pytorch_saver(policy.ac)
     epoch_step = args.epoch_step
     local_epoch_step = int(args.epoch_step / num_procs())
-    buffer = PPOBuffer(state_shape, 1, local_epoch_step, device, args.gamma, args.lamda)
+    buffer = PPOBuffer(state_shape, 2, local_epoch_step, device, args.gamma, args.lamda)
 
-    runner = Runner(env, policy, buffer, epoch_step, logger, device)
+    runner = Runner(env, policy, buffer, epoch_step, logger, device, args.save_dir)
 
     runner.rollout(args.train_epoch)
 
@@ -46,6 +48,10 @@ if __name__ == '__main__':
     # wandb.init(project="Olympics_Running", entity="the-one")
     args = read_args()
     logger, save_path, log_file = init_log(args.save_dir)
+    with open(save_path+'/arguments.txt', 'w') as f:
+        json.dump(args.__dict__, f, indent=2)
+    # with open(save_path+'/arguments.txt', 'r') as f:
+    #     args.__dict__ = json.load(f)
     args.save_dir = save_path
     mpi_fork(args.cpu)
     main(args)

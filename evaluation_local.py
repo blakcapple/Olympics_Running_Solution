@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 import random
-from agents.rl.submission import agent as rl_agent
+from agents.rl.submission import agent, agent_base
 from env.chooseenv import make
 from tabulate import tabulate
 import argparse
@@ -24,13 +24,17 @@ def get_join_actions(state, algo_list):
 
     for agent_idx in range(len(algo_list)):
         if algo_list[agent_idx] == 'random':
-            driving_force = random.uniform(-100, 200)
-            turing_angle = random.uniform(-30, 30)
-            joint_actions.append([[driving_force], [turing_angle]])
+            # driving_force = random.uniform(-100, 200)
+            # turing_angle = random.uniform(-30, 30)
+            # joint_actions.append([[driving_force], [turing_angle]])
+            obs = state[agent_idx]['obs']
+            actions_raw = agent_base.choose_action(obs)
+            actions = actions_map[actions_raw.item()]
+            joint_actions.append([[actions[0]], [actions[1]]])
 
         elif algo_list[agent_idx] == 'rl':
             obs = state[agent_idx]['obs']
-            actions_raw = rl_agent.choose_action(obs)
+            actions_raw = agent.choose_action(obs)
             actions = actions_map[actions_raw.item()]
             joint_actions.append([[actions[0]], [actions[1]]])
 
