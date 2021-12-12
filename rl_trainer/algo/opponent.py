@@ -21,10 +21,12 @@ class random_agent:
         random.seed(seed)
 
     def act(self, obs):
-        force = random.uniform(self.force_range[0], self.force_range[1])
-        angle = random.uniform(self.angle_range[0], self.angle_range[1])
+        actions = []
+        for _ in range(obs.shape[0]):
+            a = random.randint(0, 35)
+            actions.append(a)
 
-        return [[force], [angle]]
+        return actions
 
 class rl_agent:
     

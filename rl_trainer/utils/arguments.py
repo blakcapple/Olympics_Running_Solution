@@ -20,7 +20,7 @@ def read_args():
     parser.add_argument('--target_kl', default=0.03, type=float)
     parser.add_argument('--clip_ratio', default=0.2, type=float)
     parser.add_argument('--max_grad_norm', default=0.5, type=float)
-    parser.add_argument('--epoch_step', default=3000, type=int)
+    parser.add_argument('--epoch_step', default=100, type=int)
     parser.add_argument('--save_dir', default='data', type=str)
 
     args = parser.parse_args()

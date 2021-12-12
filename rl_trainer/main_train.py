@@ -16,29 +16,40 @@ from spinup.utils.mpi_tools import mpi_fork, proc_id, num_procs
 import numpy as np
 import wandb
 from utils.log import init_log 
+from env.vec_env.subproc_vec_env import SubprocVecEnv
+from env.vec_env.dummy_vec_env import DummyVecEnv
     
+
+def build_env(args):
+    def get_env_fn(rank):
+        def init_env():
+            env = make(args.game_name, args.seed + rank*1000)
+            return env 
+        return init_env 
+    if args.cpu == 1:
+        return DummyVecEnv(get_env_fn(0))
+    else:
+        return SubprocVecEnv([get_env_fn(i) for i in range(args.cpu)])
+
 def main(args):
     # Special function to avoid certain slowdowns from PyTorch + MPI combo. 
     setup_pytorch_for_mpi()
     # Random seed
-    args.seed += 100 * proc_id()
+    args.seed += 100
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-    env = make(args.game_name)
+    env = build_env(args)
     state_shape = [1, 25, 25]
     action_shape = 35
-    device = 'cpu' # spinning up mpi tools only suppor cpu 
+    device = 'cpu' 
     logger_kwargs = setup_logger_kwargs(args.algo, args.seed, data_dir=args.save_dir)
     logger = EpochLogger(**logger_kwargs)
     policy = PPO(state_shape, action_shape, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
                 logger=logger, clip_ratio=args.clip_ratio, train_pi_iters=args.train_pi_iters, 
                 train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, 
                 max_grad_norm=args.max_grad_norm)
-    sync_params(policy.ac) # Sync params across processes
-    logger.setup_pytorch_saver(policy.ac)
     epoch_step = args.epoch_step
-    local_epoch_step = int(args.epoch_step / num_procs())
-    buffer = PPOBuffer(state_shape, 1, local_epoch_step, device, args.gamma, args.lamda)
+    buffer = PPOBuffer(state_shape, 1, args.epoch_step, args.cpu, device, args.gamma, args.lamda)
 
     runner = Runner(env, policy, buffer, epoch_step, logger, device, args.save_dir)
 
@@ -53,6 +64,5 @@ if __name__ == '__main__':
     # with open(save_path+'/arguments.txt', 'r') as f:
     #     args.__dict__ = json.load(f)
     args.save_dir = save_path
-    mpi_fork(args.cpu)
     main(args)
 
