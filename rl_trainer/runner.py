@@ -14,12 +14,11 @@ actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [
             28: [140, 18], 29: [140, 30], 30: [200, -30], 31: [200, -18], 32: [200, -6], 33: [200, 6], 34: [200, 18],
             35: [200, 30]} 
 
-def wrapped_action(action, type='discrete'):
-    if type == 'discrete':
-        action = actions_map[action.item()]
-        wrapped_action = [[action[0]], [action[1]]] 
-    elif type == 'continue':
-        wrapped_action = [[action[0]*150+50], action[1]*30]
+def wrapped_action(action):
+
+    action = actions_map[action.item()]
+    wrapped_action = [[action[0]], [action[1]]] 
+
     return wrapped_action 
 
 
@@ -55,7 +54,7 @@ class Runner:
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor([obs_ctrl_agent], dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor([obs_oppo_agent], dtype=torch.float32, device=self.device))
-                action_ctrl = wrapped_action(a, type='continue')
+                action_ctrl = wrapped_action(a)
                 action = [action_opponent, action_ctrl]
                 next_o, r, d, _, info = self.env.step(action)
                 next_obs_ctrl_agent = np.array(next_o[self.ctrl_agent_index]['obs']).reshape(1, 25, 25)
@@ -126,13 +125,13 @@ class Runner:
             self.logger.log_tabular('ClipFrac', average_only=True)
             self.logger.log_tabular('Time', time.time()-start_time)
             self.logger.dump_tabular()
-            if epoch > 100 and epoch % 10 == 0:
+            if epoch > 100 and epoch % 100 == 0:
                 self.opponet.load_model(self.load_pth)  # load past model to self-play
-            if epoch % 10 == 0 or epoch == (epochs-1):
+            if epoch % 100 == 0 or epoch == (epochs-1):
                 sync_params(self.policy.ac)
                 if self.id == 0:
                     self.policy.save_models()
-            if epoch == 100: # change the random agent to rl agent
+            if epoch == 500: # change the random agent to rl agent
                 state_shape = [1, 25, 25]
                 action_shape = 35
                 self.opponet = rl_agent(state_shape, action_shape)

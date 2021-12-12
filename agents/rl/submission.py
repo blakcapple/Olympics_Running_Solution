@@ -128,12 +128,12 @@ class RLAgent:
 
 state_shape = [1, 25, 25]
 action_shape = 35
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_12.9.pth"
 agent = RLAgent(state_shape, action_shape)
 agent.load_model(load_pth)
-# load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_base.pth"
-# agent_base = RLAgent(state_shape, action_shape)
-# agent_base.load_model(load_path2)
+load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_base.pth"
+agent_base = RLAgent(state_shape, action_shape)
+agent_base.load_model(load_path2)
 
 def my_controller(observation_list, action_space_list, is_act_continuous):
     obs = observation_list['obs'].copy()

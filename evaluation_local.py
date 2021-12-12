@@ -24,9 +24,12 @@ def get_join_actions(state, algo_list):
 
     for agent_idx in range(len(algo_list)):
         if algo_list[agent_idx] == 'random':
-            # driving_force = random.uniform(-100, 200)
-            # turing_angle = random.uniform(-30, 30)
-            # joint_actions.append([[driving_force], [turing_angle]])
+            driving_force = random.uniform(-100, 200)
+            turing_angle = random.uniform(-30, 30)
+            joint_actions.append([[driving_force], [turing_angle]])
+
+        elif algo_list[agent_idx] == 'rl_base':
+
             obs = state[agent_idx]['obs']
             actions_raw = agent_base.choose_action(obs)
             actions = actions_map[actions_raw.item()]
@@ -102,7 +105,7 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--my_ai", default='rl', help='rl/random')
-    parser.add_argument("--opponent", default='random', help='rl/random')
+    parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
     parser.add_argument("--episode", default=20)
     parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()

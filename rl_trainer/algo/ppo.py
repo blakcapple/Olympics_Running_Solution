@@ -8,9 +8,9 @@ import os
 class PPO:
 
     def __init__(self, state_shape, action_shape, pi_lr, v_lr, device, logger, clip_ratio=0.2, 
-                train_pi_iters=80, train_v_iters=80, target_kl=0.01, max_grad_norm=0.5, save_dir='data/models', type='categorical'):
+                train_pi_iters=80, train_v_iters=80, target_kl=0.01, max_grad_norm=0.5, save_dir='data/models'):
 
-        self.ac = CNNActorCritic(state_shape, action_shape, type).to(device)
+        self.ac = CNNActorCritic(state_shape, action_shape).to(device)
         self.clip_ratio = clip_ratio
         self.pi_optimizer = Adam(self.ac.pi.parameters(), lr=pi_lr)
         self.v_optimizer = Adam(self.ac.v.parameters(), lr=v_lr)

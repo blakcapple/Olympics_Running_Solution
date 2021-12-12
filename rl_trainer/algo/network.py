@@ -117,14 +117,10 @@ class CNNCritic(nn.Module):
 
 class CNNActorCritic(nn.Module):
     
-    def __init__(self, state_shape, action_shape, activation=nn.ReLU, type='categorical'):
+    def __init__(self, state_shape, action_shape, activation=nn.ReLU):
         super().__init__()
 
-        if type == 'categorical':
-            self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
-        elif type == 'gaussian':
-            self.pi = CNNGaussianActor(state_shape, action_shape, activation)
-            
+        self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
         self.v = CNNCritic(state_shape, activation)
     
     def step(self, obs):
