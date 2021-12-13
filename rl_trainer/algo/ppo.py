@@ -4,6 +4,7 @@ from torch.optim import Adam
 from spinup.utils.mpi_pytorch import mpi_avg_grads
 from spinup.utils.mpi_tools import mpi_avg
 import os
+from copy import deepcopy
 
 class PPO:
 
@@ -23,8 +24,13 @@ class PPO:
         self.max_grad_norm = max_grad_norm
 
     def compute_loss_pi(self, data):
-
+        
+        data = deepcopy(data)
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
+        obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
+        act = act.view(-1, act.shape[2])
+        adv = adv.view(-1)
+        logp_old = logp_old.view(-1)
         # Policy loss
         pi, logp = self.ac.pi(obs, act)
         ratio = torch.exp(logp - logp_old)
@@ -40,8 +46,11 @@ class PPO:
         return loss_pi, pi_info
 
     def compute_loss_v(self, data):
-
+        
+        data = deepcopy(data)
         obs, ret = data['obs'], data['ret']
+        obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
+        ret = ret.view(-1)
 
         return ((self.ac.v(obs) - ret)**2).mean()
 
@@ -54,21 +63,19 @@ class PPO:
         for i in range(self.train_pi_iters):
             self.pi_optimizer.zero_grad()
             loss_pi, pi_info = self.compute_loss_pi(data)
-            kl = mpi_avg(pi_info['kl'])
+            kl = pi_info['kl']
             if kl > 1.5 * self.target_kl:
                 self.logger.log('Early stopping at step %d due to reaching max kl.'%i)
                 break
 
             loss_pi.backward()
             # torch.nn.utils.clip_grad_norm_(self.ac.pi.parameters(), self.max_grad_norm)
-            mpi_avg_grads(self.ac.pi)    # average grads across MPI processes
             self.pi_optimizer.step()
         # Value function learning
         for i in range(self.train_v_iters):
             self.v_optimizer.zero_grad()
             loss_v = self.compute_loss_v(data)
             loss_v.backward()
-            mpi_avg_grads(self.ac.v)    # average grads across MPI processes
             torch.nn.utils.clip_grad_norm_(self.ac.v.parameters(), self.max_grad_norm)
             self.v_optimizer.step()
 

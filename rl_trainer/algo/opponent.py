@@ -38,9 +38,8 @@ class rl_agent:
 
         pi, _ = self.actor(obs)
         a_raw = pi.sample()
-        a = actions_map[a_raw.item()]
-        wrap_a = [[a[0]], [a[1]]]
-        return wrap_a
+        
+        return a_raw.detach().cpu().numpy()
 
     def load_model(self, pth):
 

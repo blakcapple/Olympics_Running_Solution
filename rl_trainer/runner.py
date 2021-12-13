@@ -4,8 +4,6 @@ from rl_trainer.algo.opponent import random_agent, rl_agent
 import wandb
 import time
 import os 
-from spinup.utils.mpi_pytorch import sync_params
-from spinup.utils.mpi_tools import num_procs, proc_id
 #dicretise action space
 actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
             7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
@@ -28,13 +26,13 @@ def wrapped_action(actions, opponent_actions):
 
 class Runner:
 
-    def __init__(self, env, policy, buffer, total_epoch_step, logger, device, load_dir, n_rollout=6):
+    def __init__(self, env, policy, buffer, local_epoch_step, logger, device, load_dir, n_rollout=6):
         
         self.env = env
         self.policy = policy 
         self.buffer = buffer
-        self.total_epoch_step = total_epoch_step
-        self.local_steps_per_epoch = int(total_epoch_step / num_procs())
+        self.total_epoch_step = local_epoch_step * n_rollout
+        self.local_steps_per_epoch = local_epoch_step
         self.logger = logger 
         self.ep_ret_history = [] 
         self.best_ep_ret = -np.inf
@@ -47,8 +45,8 @@ class Runner:
     def rollout(self, epochs):
 
         o= self.env.reset()
-        ep_lens = np.ones(self.n_rollout)
-        ep_rets = np.ones(self.n_rollout)
+        ep_lens = np.zeros(self.n_rollout)
+        ep_rets = np.zeros(self.n_rollout)
         obs_ctrl_agent = np.array(o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
         obs_oppo_agent = np.array(o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
         start_time = time.time()
@@ -68,6 +66,13 @@ class Runner:
                 for i, done in enumerate(d):
                     if not done:
                         r[i] = [-1, -1]
+                    if done:
+                        if r[i][0] == r[i][1]:
+                            r[i]=[-1., -1.]
+                        elif r[i][1] > r[i][0]:
+                            r[i][0] -= 100
+                        elif r[i][0] > r[i][1]:
+                            r[i][1] -=100
 
                 for i in range(self.n_rollout):
                     ep_rets[i] += (r[i, self.ctrl_agent_index])
@@ -86,8 +91,8 @@ class Runner:
 
                 for index, done in enumerate(terminal):
                     if done or epoch_ended:
-                        # if epoch_ended and not(done):
-                        #     print('Warning: trajectory cut off by epoch at %d steps.'%ep_len, flush=True)
+                        if epoch_ended and not(done):
+                            print('Warning: trajectory cut off by epoch at %d steps.'%ep_lens[index], flush=True)
                         # if trajectory didn't reach terminal state, bootstrap value target
                         if epoch_ended:
                             _, v, _ = self.policy.step(torch.as_tensor([obs_ctrl_agent[index]], dtype=torch.float32, device=self.device))
@@ -125,11 +130,10 @@ class Runner:
             self.logger.log_tabular('ClipFrac', average_only=True)
             self.logger.log_tabular('Time', time.time()-start_time)
             self.logger.dump_tabular()
-            if epoch > 100 and epoch % 100 == 0:
+            if epoch > 500 and epoch % 100 == 0:
                 self.opponet.load_model(self.load_pth)  # load past model to self-play
             if epoch % 100 == 0 or epoch == (epochs-1):
-                if self.id == 0:
-                    self.policy.save_models()
+                self.policy.save_models()
             if epoch == 500: # change the random agent to rl agent
                 state_shape = [1, 25, 25]
                 action_shape = 35
