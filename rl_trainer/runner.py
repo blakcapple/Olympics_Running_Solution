@@ -125,7 +125,7 @@ class Runner:
             self.logger.log_tabular('ClipFrac', average_only=True)
             self.logger.log_tabular('Time', time.time()-start_time)
             self.logger.dump_tabular()
-            if epoch > 100 and epoch % 100 == 0:
+            if epoch > 500 and epoch % 100 == 0:
                 self.opponet.load_model(self.load_pth)  # load past model to self-play
             if epoch % 100 == 0 or epoch == (epochs-1):
                 sync_params(self.policy.ac)

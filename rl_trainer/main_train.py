@@ -24,7 +24,7 @@ def main(args):
     args.seed += 100 * proc_id()
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-    env = make(args.game_name)
+    env = make(args.game_name, args.seed)
     state_shape = [1, 25, 25]
     action_shape = 35
     device = 'cpu' # spinning up mpi tools only suppor cpu 
