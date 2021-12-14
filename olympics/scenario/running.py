@@ -18,7 +18,6 @@ class Running(OlympicsBase):
 
         #self.is_render = True
 
-
     def check_overlap(self):
         #todo
         pass

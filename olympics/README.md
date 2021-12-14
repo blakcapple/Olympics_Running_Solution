@@ -13,7 +13,7 @@ In every map, agents can only see object in front of him, this includes the boun
 
 The observation is a 25*25 array shown as below:
 
-<img src=https://gitee.com/jidiai/competition-olympics-running/raw/main/assets/agent_view.png>
+<img src=https://github.com/jidiai/Competition_Olympics-Running/blob/main/assets/agent_view.png>
 
 where each entry corresponds to different object, for instance:
 

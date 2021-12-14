@@ -29,7 +29,6 @@ def build_env(args):
     return SubprocVecEnv([get_env_fn(i) for i in range(args.cpu)])
 
 def main(args):
-    # Special function to avoid certain slowdowns from PyTorch + MPI combo. 
     # Random seed
     args.seed += 100
     torch.manual_seed(args.seed)
