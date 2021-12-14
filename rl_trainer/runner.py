@@ -4,6 +4,7 @@ from rl_trainer.algo.opponent import random_agent, rl_agent
 import wandb
 import time
 import os 
+import pdb
 #dicretise action space
 actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
             7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
@@ -58,8 +59,12 @@ class Runner:
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
+                time1 = time.time()
                 env_a = wrapped_action(a, action_opponent)
+                time_wrap = time.time() - time1
                 next_o, r, d, info = self.env.step(env_a)
+                time_env = time.time() - time1 - time_wrap
+                # pdb.set_trace()
                 next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
                 next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
                 r = r.reshape(self.n_rollout, 2)
