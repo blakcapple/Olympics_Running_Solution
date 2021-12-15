@@ -9,7 +9,7 @@ def read_args():
     parser.add_argument('--map', default=1, type = int)
     parser.add_argument('--shuffle_map', action='store_true')
     parser.add_argument('--seed', default=1, type=int)
-    parser.add_argument('--cpu', type=int, default=1)
+    parser.add_argument('--cpu', type=int, default=20)
     # ppo parameters
     parser.add_argument('--pi_lr', default=3e-4, type=float)
     parser.add_argument('--v_lr', default=5e-4, type=float)

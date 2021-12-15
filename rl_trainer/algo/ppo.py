@@ -86,18 +86,21 @@ class PPO:
                      DeltaLossPi=(loss_pi.item() - pi_l_old),
                      DeltaLossV=(loss_v.item() - v_l_old))
 
-    def save_models(self):
-
-        actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
-        self.ac.pi.save_model(actor_pth)
-        critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
+    def save_models(self, index=None):
+        if index is not None:
+            actor_pth = os.path.join(self.check_point_dir, f'actor_{index}.pth')
+            critic_pth = os.path.join(self.check_point_dir, f'critic_{index}.pth')
+        elif index == None:
+            actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
+            critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
         self.ac.v.save_model(critic_pth)
+        self.ac.pi.save_model(actor_pth)
 
-    def load_models(self):
+    def load_models(self, load_pth):
 
-        actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
+        actor_pth = os.path.join(load_pth, 'actor.pth')
         self.ac.pi.load_model(actor_pth)
-        critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
+        critic_pth = os.path.join(load_pth, 'critic.pth')
         self.ac.v.load_model(critic_pth)
 
     def select_action(self, obs, phase='train'):

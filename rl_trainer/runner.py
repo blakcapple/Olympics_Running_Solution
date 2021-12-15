@@ -40,8 +40,9 @@ class Runner:
         self.ctrl_agent_index = 1
         self.device = device
         self.opponet = random_agent()
-        self.load_pth = os.path.join(load_dir, 'models/actor.pth')
+        self.load_dir = load_dir
         self.n_rollout = n_rollout
+        self.save_index = []
 
     def rollout(self, epochs):
 
@@ -59,12 +60,8 @@ class Runner:
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
-                time1 = time.time()
                 env_a = wrapped_action(a, action_opponent)
-                time_wrap = time.time() - time1
                 next_o, r, d, info = self.env.step(env_a)
-                time_env = time.time() - time1 - time_wrap
-                # pdb.set_trace()
                 next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
                 next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
                 r = r.reshape(self.n_rollout, 2)
@@ -117,32 +114,46 @@ class Runner:
                         ep_rets[index], ep_lens[index] = 0, 0
             # update policy
             data = self.buffer.get()
-            # self.policy.learn(data)
+            self.policy.learn(data)
             # Log info about epoch
-            # self.logger.log_tabular('Epoch', epoch)
-            # self.logger.log_tabular('WinR', average_only=True)
-            # self.logger.log_tabular('LoseR', average_only=True)
-            # self.logger.log_tabular('EpRet', with_min_and_max=True)
-            # self.logger.log_tabular('EpLen', average_only=True)
-            # self.logger.log_tabular('VVals', with_min_and_max=True)
-            # self.logger.log_tabular('TotalEnvInteracts', (epoch+1)*self.total_epoch_step)
-            # self.logger.log_tabular('LossPi', average_only=True)
-            # self.logger.log_tabular('LossV', average_only=True)
-            # self.logger.log_tabular('DeltaLossPi', average_only=True)
-            # self.logger.log_tabular('DeltaLossV', average_only=True)
-            # self.logger.log_tabular('Entropy', average_only=True)
-            # self.logger.log_tabular('KL', average_only=True)
-            # self.logger.log_tabular('ClipFrac', average_only=True)
+            self.logger.log_tabular('Epoch', epoch)
+            self.logger.log_tabular('WinR', average_only=True)
+            self.logger.log_tabular('LoseR', average_only=True)
+            self.logger.log_tabular('EpRet', with_min_and_max=True)
+            self.logger.log_tabular('EpLen', average_only=True)
+            self.logger.log_tabular('VVals', with_min_and_max=True)
+            self.logger.log_tabular('TotalEnvInteracts', (epoch+1)*self.total_epoch_step)
+            self.logger.log_tabular('LossPi', average_only=True)
+            self.logger.log_tabular('LossV', average_only=True)
+            self.logger.log_tabular('DeltaLossPi', average_only=True)
+            self.logger.log_tabular('DeltaLossV', average_only=True)
+            self.logger.log_tabular('Entropy', average_only=True)
+            self.logger.log_tabular('KL', average_only=True)
+            self.logger.log_tabular('ClipFrac', average_only=True)
             self.logger.log_tabular('Time', time.time()-start_time)
             self.logger.dump_tabular()
-            if epoch > 500 and epoch % 100 == 0:
-                self.opponet.load_model(self.load_pth)  # load past model to self-play
-            if epoch % 100 == 0 or epoch == (epochs-1):
-                self.policy.save_models()
+
+            if epoch % 50 == 0 or epoch == (epochs-1):
+                self.policy.save_models(epoch)
+                self.save_index.append(epoch)
+
             if epoch == 500: # change the random agent to rl agent
                 state_shape = [1, 25, 25]
                 action_shape = 35
                 self.opponet = rl_agent(state_shape, action_shape)
-                self.opponet.load_model(self.load_pth)
+                load_pth = os.path.join(self.load_dir, 'models/actor_400.pth')
+                self.opponet.load_model(load_pth)
+
+            if epoch > 500 and epoch % 50 == 0:
+                p = np.random.rand(1)
+                low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
+                if p > 0.7:
+                    index = self.save_index[-1]  # load the latest model
+                else:
+                    number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
+                    index = self.save_index[number]
+                load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
+                self.opponet.load_model(self.load_pth)  # load past model to self-play
+
             
 
