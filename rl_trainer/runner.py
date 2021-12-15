@@ -131,7 +131,7 @@ class Runner:
                 sync_params(self.policy.ac)
                 if self.id == 0:
                     self.policy.save_models()
-            if epoch == 500: # change the random agent to rl agent
+            if epoch == 0 or epoch == 500: # change the random agent to rl agent
                 state_shape = [1, 25, 25]
                 action_shape = 35
                 self.opponet = rl_agent(state_shape, action_shape)

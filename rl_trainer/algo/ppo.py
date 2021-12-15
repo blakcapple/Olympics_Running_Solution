@@ -86,13 +86,16 @@ class PPO:
         critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
         self.ac.v.save_model(critic_pth)
 
-    def load_models(self):
-
-        actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
-        self.ac.pi.load_model(actor_pth)
-        critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
-        self.ac.v.load_model(critic_pth)
-
+    def load_models(self, load_pth=None):
+        
+        if load_pth == None:
+            actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
+            self.ac.pi.load_model(actor_pth)
+            critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
+            self.ac.v.load_model(critic_pth)
+        else:
+            self.ac.pi.load_model(load_pth)
+    
     def select_action(self, obs, phase='train'):
 
         a = self.ac.act(obs, phase)

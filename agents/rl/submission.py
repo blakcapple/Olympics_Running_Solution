@@ -128,10 +128,10 @@ class RLAgent:
 
 state_shape = [1, 25, 25]
 action_shape = 35
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_12.9.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1700.pth"
 agent = RLAgent(state_shape, action_shape)
 agent.load_model(load_pth)
-load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_base.pth"
+load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_700.pth"
 agent_base = RLAgent(state_shape, action_shape)
 agent_base.load_model(load_path2)
 

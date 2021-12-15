@@ -106,19 +106,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--my_ai", default='rl', help='rl/random')
     parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
-    parser.add_argument("--episode", default=20)
+    parser.add_argument("--episode", default=10)
     parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()
 
     env_type = "olympics-running"
     game = make(env_type, conf=None, seed = 1)
-
     if args.map != 'all':
         game.specify_a_map(int(args.map))
         shuffle = False
     else:
         shuffle = True
-
+    game.specify_a_map(int(6))
+    shuffle = False
     #torch.manual_seed(1)
     #np.random.seed(1)
     #random.seed(1)

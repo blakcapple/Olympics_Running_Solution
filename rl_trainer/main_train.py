@@ -39,9 +39,10 @@ def main(args):
     epoch_step = args.epoch_step
     local_epoch_step = int(args.epoch_step / num_procs())
     buffer = PPOBuffer(state_shape, 1, local_epoch_step, device, args.gamma, args.lamda)
-
+    if args.load:
+        policy.load_models(args.load_path)
+        print('load')
     runner = Runner(env, policy, buffer, epoch_step, logger, device, args.save_dir)
-
     runner.rollout(args.train_epoch)
 
 if __name__ == '__main__':
