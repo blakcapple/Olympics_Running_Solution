@@ -30,9 +30,9 @@ class random_agent:
 
 class rl_agent:
     
-    def __init__(self, state_shape, action_shape):
+    def __init__(self, state_shape, action_shape, device):
         
-        self.actor = CNNCategoricalActor(state_shape, action_shape, nn.ReLU)
+        self.actor = CNNCategoricalActor(state_shape, action_shape, nn.ReLU).to(device)
 
     def act(self, obs):
 

@@ -1,21 +1,19 @@
 import json
 from pathlib import Path
 import sys
+import pdb
 base_dir = str(Path(__file__).resolve().parent.parent)
 sys.path.append(base_dir)
 from utils.arguments import read_args
 from env.chooseenv import make
 from algo.ppo import PPO
 from algo.buffer import PPOBuffer
-import torch 
-from spinup.utils.logx import EpochLogger
-from spinup.utils.run_utils import setup_logger_kwargs
+import torch
 from runner import Runner
 import numpy as np
-import wandb
 from utils.log import init_log 
 from env.vec_env.subproc_vec_env import SubprocVecEnv
-    
+
 
 def build_env(args):
     def get_env_fn(rank):
@@ -33,13 +31,13 @@ def main(args):
     args.seed += 100
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+
     env = build_env(args)
+
     state_shape = [1, 25, 25]
     action_shape = 35
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('device', device)
-    logger_kwargs = setup_logger_kwargs(args.algo, args.seed, data_dir=args.save_dir)
-    logger = EpochLogger(**logger_kwargs)
     policy = PPO(state_shape, action_shape, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
                 logger=logger, clip_ratio=args.clip_ratio, train_pi_iters=args.train_pi_iters, 
                 train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, 

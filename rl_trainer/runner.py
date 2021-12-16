@@ -1,7 +1,6 @@
 import torch 
 import numpy as np 
 from rl_trainer.algo.opponent import random_agent, rl_agent
-import wandb
 import time
 import os 
 import pdb
@@ -82,7 +81,7 @@ class Runner:
 
                 # save and log
                 self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout,1), r[:, self.ctrl_agent_index], v, logp)
-                self.logger.store(VVals=v)
+
                 
                 # Update obs (critical!)
                 obs_ctrl_agent = next_obs_ctrl_agent
@@ -107,31 +106,17 @@ class Runner:
                             win_is_op = 1 if r[index][self.ctrl_agent_index] < r[index][1-self.ctrl_agent_index] else 0
                             record_win.append(win_is)
                             record_win_op.append(win_is_op)
-                            self.logger.store(WinR=win_is)
-                            self.logger.store(LoseR=win_is_op)
                             # only save EpRet / EpLen if trajectory finished
-                            self.logger.store(EpRet=ep_rets[index], EpLen=ep_lens[index])
                         ep_rets[index], ep_lens[index] = 0, 0
             # update policy
             data = self.buffer.get()
             self.policy.learn(data)
             # Log info about epoch
-            self.logger.log_tabular('Epoch', epoch)
-            self.logger.log_tabular('WinR', average_only=True)
-            self.logger.log_tabular('LoseR', average_only=True)
-            self.logger.log_tabular('EpRet', with_min_and_max=True)
-            self.logger.log_tabular('EpLen', average_only=True)
-            self.logger.log_tabular('VVals', with_min_and_max=True)
-            self.logger.log_tabular('TotalEnvInteracts', (epoch+1)*self.total_epoch_step)
-            self.logger.log_tabular('LossPi', average_only=True)
-            self.logger.log_tabular('LossV', average_only=True)
-            self.logger.log_tabular('DeltaLossPi', average_only=True)
-            self.logger.log_tabular('DeltaLossV', average_only=True)
-            self.logger.log_tabular('Entropy', average_only=True)
-            self.logger.log_tabular('KL', average_only=True)
-            self.logger.log_tabular('ClipFrac', average_only=True)
-            self.logger.log_tabular('Time', time.time()-start_time)
-            self.logger.dump_tabular()
+            self.logger.info('epoch', epoch,
+                            'WinR:', np.mean(record_win[-100:,]), 
+                            'LoseR:', np.mean(record_win_op[-100:,]),
+                            'time:', time.time() - start_time,
+                            )
 
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(epoch)

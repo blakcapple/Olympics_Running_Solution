@@ -1,7 +1,6 @@
 import numpy as np
 from algo.utils import combined_shape, discount_cumsum
 import torch 
-from spinup.utils.mpi_tools import mpi_statistics_scalar
 
 class PPOBuffer:
     """

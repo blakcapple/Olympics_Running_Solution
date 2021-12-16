@@ -1,8 +1,6 @@
 from rl_trainer.algo.network import CNNActorCritic
 import torch
 from torch.optim import Adam
-from spinup.utils.mpi_pytorch import mpi_avg_grads
-from spinup.utils.mpi_tools import mpi_avg
 import os
 from copy import deepcopy
 
@@ -65,7 +63,7 @@ class PPO:
             loss_pi, pi_info = self.compute_loss_pi(data)
             kl = pi_info['kl']
             if kl > 1.5 * self.target_kl:
-                self.logger.log('Early stopping at step %d due to reaching max kl.'%i)
+                self.logger.info('Early stopping at step %d due to reaching max kl.'%i)
                 break
 
             loss_pi.backward()
@@ -81,10 +79,6 @@ class PPO:
 
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
-        self.logger.store(LossPi=pi_l_old, LossV=v_l_old,
-                     KL=kl, Entropy=ent, ClipFrac=cf,
-                     DeltaLossPi=(loss_pi.item() - pi_l_old),
-                     DeltaLossV=(loss_v.item() - v_l_old))
 
     def save_models(self, index=None):
         if index is not None:
