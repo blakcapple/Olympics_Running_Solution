@@ -4,6 +4,7 @@ from rl_trainer.algo.opponent import random_agent, rl_agent
 import time
 import os 
 import pdb
+import wandb
 #dicretise action space
 actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
             7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
@@ -19,7 +20,7 @@ def wrapped_action(actions, opponent_actions):
         real_opponent_action = actions_map[opponent_action]
         wrapped_action = [[real_action[0]], [real_action[1]]]
         wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
-        wrapped_actions.append([wrapped_action, wrapped_opponent_action])
+        wrapped_actions.append([wrapped_opponent_action, wrapped_action])
 
     return wrapped_actions 
 
@@ -106,30 +107,27 @@ class Runner:
                             win_is_op = 1 if r[index][self.ctrl_agent_index] < r[index][1-self.ctrl_agent_index] else 0
                             record_win.append(win_is)
                             record_win_op.append(win_is_op)
+                            wandb.log({'WinR':np.mean(record_win[-100:]), 'raw_reward':np.mean(ep_rets)})
                             # only save EpRet / EpLen if trajectory finished
                         ep_rets[index], ep_lens[index] = 0, 0
             # update policy
             data = self.buffer.get()
             self.policy.learn(data)
             # Log info about epoch
-            self.logger.info('epoch', epoch,
-                            'WinR:', np.mean(record_win[-100:,]), 
-                            'LoseR:', np.mean(record_win_op[-100:,]),
-                            'time:', time.time() - start_time,
-                            )
+            self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
 
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(epoch)
                 self.save_index.append(epoch)
 
-            if epoch == 500: # change the random agent to rl agent
+            if epoch == 1000: # change the random agent to rl agent
                 state_shape = [1, 25, 25]
                 action_shape = 35
-                self.opponet = rl_agent(state_shape, action_shape)
-                load_pth = os.path.join(self.load_dir, 'models/actor_400.pth')
+                self.opponet = rl_agent(state_shape, action_shape, self.device)
+                load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
                 self.opponet.load_model(load_pth)
 
-            if epoch > 500 and epoch % 50 == 0:
+            if epoch > 1000 and epoch % 50 == 0:
                 p = np.random.rand(1)
                 low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
                 if p > 0.7:
@@ -138,7 +136,7 @@ class Runner:
                     number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
                     index = self.save_index[number]
                 load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
-                self.opponet.load_model(self.load_pth)  # load past model to self-play
+                self.opponet.load_model(load_pth)  # load past model to self-play
 
             
 

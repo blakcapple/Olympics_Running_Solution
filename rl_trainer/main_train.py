@@ -13,6 +13,7 @@ from runner import Runner
 import numpy as np
 from utils.log import init_log 
 from env.vec_env.subproc_vec_env import SubprocVecEnv
+import wandb
 
 
 def build_env(args):
@@ -50,7 +51,7 @@ def main(args):
     runner.rollout(args.train_epoch)
 
 if __name__ == '__main__':
-    # wandb.init(project="Olympics_Running", entity="the-one")
+    wandb.init(project="Olympics_Running", entity="the-one")
     args = read_args()
     logger, save_path, log_file = init_log(args.save_dir)
     with open(save_path+'/arguments.txt', 'w') as f:

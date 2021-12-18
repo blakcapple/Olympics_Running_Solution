@@ -3,6 +3,7 @@ import torch
 from torch.optim import Adam
 import os
 from copy import deepcopy
+import wandb
 
 class PPO:
 
@@ -69,6 +70,7 @@ class PPO:
             loss_pi.backward()
             # torch.nn.utils.clip_grad_norm_(self.ac.pi.parameters(), self.max_grad_norm)
             self.pi_optimizer.step()
+        wandb.log({'stop_pi':i})
         # Value function learning
         for i in range(self.train_v_iters):
             self.v_optimizer.zero_grad()
@@ -79,6 +81,7 @@ class PPO:
 
         # Log changes from update
         kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
+        wandb.log({'loss_pi':loss_pi, 'loss_v':loss_v})
 
     def save_models(self, index=None):
         if index is not None:

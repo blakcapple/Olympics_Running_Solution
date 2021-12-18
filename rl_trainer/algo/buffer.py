@@ -18,8 +18,10 @@ class PPOBuffer:
         self.val_buf = np.zeros((size, n_rollout), dtype=np.float32)
         self.logp_buf = np.zeros((size, n_rollout), dtype=np.float32)
         self.gamma, self.lam = gamma, lam
-        self.ptr, self.path_start_idx, self.max_size = 0, 0, size
+        self.ptr, self.max_size = 0, size
+        self.path_start_idx = np.zeros(n_rollout, dtype=int) # every rollout have different idx
         self.device = device
+        self.n_rollout = n_rollout
 
     def store(self, obs, act, rew, val, logp):
         """
@@ -49,7 +51,7 @@ class PPOBuffer:
         for timesteps beyond the arbitrary episode horizon (or epoch cutoff).
         """
 
-        path_slice = slice(self.path_start_idx, self.ptr)
+        path_slice = slice(self.path_start_idx[n_rollout], self.ptr)
         rews = np.append(self.rew_buf[path_slice, n_rollout], last_val)
         vals = np.append(self.val_buf[path_slice, n_rollout], last_val)
         
@@ -60,7 +62,7 @@ class PPOBuffer:
         # the next line computes rewards-to-go, to be targets for the value function
         self.ret_buf[path_slice, n_rollout] = discount_cumsum(rews, self.gamma)[:-1]
         
-        self.path_start_idx = self.ptr
+        self.path_start_idx[n_rollout] = self.ptr
 
     def get(self):
         """
@@ -69,7 +71,8 @@ class PPOBuffer:
         mean zero and std one). Also, resets some pointers in the buffer.
         """
         assert self.ptr == self.max_size    # buffer has to be full before you can get
-        self.ptr, self.path_start_idx = 0, 0
+        self.ptr = 0
+        self.path_start_idx = np.zeros(self.n_rollout, dtype=int)
         # the next two lines implement the advantage normalization trick
         adv_mean = np.mean(self.adv_buf)
         adv_std = np.var(self.adv_buf)
