@@ -119,7 +119,7 @@ class Runner:
             self.policy.learn(data)
             # Log info about epoch
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
-            self.ctrl_agent_index = np.random.randint(1,3) # random ctrl index
+            self.ctrl_agent_index = np.random.randint(0,1) # random ctrl index
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
