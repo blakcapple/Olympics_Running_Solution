@@ -47,7 +47,7 @@ def main(args):
     local_epoch_step = args.epoch_step / args.cpu
     buffer = PPOBuffer(state_shape, 1, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
     if args.load:
-        policy.load_models(args.load_index)
+        policy.load_models(args.load_dir, args.load_index)
     runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu, args.load_index)
 
     runner.rollout(args.train_epoch)

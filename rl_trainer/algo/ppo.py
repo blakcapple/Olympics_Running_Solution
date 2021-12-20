@@ -94,14 +94,14 @@ class PPO:
         self.ac.v.save_model(critic_pth)
         self.ac.pi.save_model(actor_pth)
 
-    def load_models(self, index=None):
+    def load_models(self, load_path, index=None):
 
         if index is not None:
-            actor_pth = os.path.join(self.check_point_dir, f'actor_{index}.pth')
-            critic_pth = os.path.join(self.check_point_dir, f'critic_{index}.pth')
+            actor_pth = os.path.join(load_path, f'actor_{index}.pth')
+            critic_pth = os.path.join(load_path, f'critic_{index}.pth')
         elif index == None:
-            actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
-            critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
+            actor_pth = os.path.join(load_path, 'actor.pth')
+            critic_pth = os.path.join(load_path, 'critic.pth')
         self.ac.v.load_model(critic_pth)
         self.ac.pi.load_model(actor_pth)
 

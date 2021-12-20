@@ -10,6 +10,7 @@ def read_args():
     parser.add_argument('--seed', default=1, type=int)
     parser.add_argument('--cpu', type=int, default=16)
     parser.add_argument('--load', default=False, action='store_true')
+    parser.add_argument('--load_dir', default='load_model', type=str)
     parser.add_argument('--load_index', default=0, type=int, help='which index to load')
     # ppo parameters
     parser.add_argument('--pi_lr', default=3e-4, type=float)
