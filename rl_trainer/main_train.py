@@ -20,6 +20,7 @@ def build_env(args):
     def get_env_fn(rank):
         def init_env():
             env = make(args.game_name, args.seed + rank*1000)
+            env.specify_a_map(args.map) # specify a difficult map
             return env 
         return init_env 
     # if args.cpu == 1:
@@ -45,8 +46,9 @@ def main(args):
                 max_grad_norm=args.max_grad_norm)
     local_epoch_step = args.epoch_step / args.cpu
     buffer = PPOBuffer(state_shape, 1, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
-
-    runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu)
+    if args.load:
+        policy.load_models(args.load_index)
+    runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu, args.load_index)
 
     runner.rollout(args.train_epoch)
 

@@ -84,6 +84,7 @@ class PPO:
         wandb.log({'loss_pi':loss_pi, 'loss_v':loss_v})
 
     def save_models(self, index=None):
+        
         if index is not None:
             actor_pth = os.path.join(self.check_point_dir, f'actor_{index}.pth')
             critic_pth = os.path.join(self.check_point_dir, f'critic_{index}.pth')
@@ -93,12 +94,16 @@ class PPO:
         self.ac.v.save_model(critic_pth)
         self.ac.pi.save_model(actor_pth)
 
-    def load_models(self, load_pth):
+    def load_models(self, index=None):
 
-        actor_pth = os.path.join(load_pth, 'actor.pth')
-        self.ac.pi.load_model(actor_pth)
-        critic_pth = os.path.join(load_pth, 'critic.pth')
+        if index is not None:
+            actor_pth = os.path.join(self.check_point_dir, f'actor_{index}.pth')
+            critic_pth = os.path.join(self.check_point_dir, f'critic_{index}.pth')
+        elif index == None:
+            actor_pth = os.path.join(self.check_point_dir, 'actor.pth')
+            critic_pth = os.path.join(self.check_point_dir, 'critic.pth')
         self.ac.v.load_model(critic_pth)
+        self.ac.pi.load_model(actor_pth)
 
     def select_action(self, obs, phase='train'):
 

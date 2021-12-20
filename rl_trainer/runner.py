@@ -1,3 +1,4 @@
+from random import random
 import torch 
 import numpy as np 
 from rl_trainer.algo.opponent import random_agent, rl_agent
@@ -13,21 +14,23 @@ actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [
             28: [140, 18], 29: [140, 30], 30: [200, -30], 31: [200, -18], 32: [200, -6], 33: [200, 6], 34: [200, 18],
             35: [200, 30]} 
 
-def wrapped_action(actions, opponent_actions):
+def wrapped_action(actions, opponent_actions, ctrl_agent_index):
     wrapped_actions = []
     for action, opponent_action in zip(actions, opponent_actions):
         real_action = actions_map[action]
         real_opponent_action = actions_map[opponent_action]
         wrapped_action = [[real_action[0]], [real_action[1]]]
         wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
-        wrapped_actions.append([wrapped_opponent_action, wrapped_action])
-
+        if ctrl_agent_index == 1:
+            wrapped_actions.append([wrapped_opponent_action, wrapped_action])
+        elif ctrl_agent_index == 0:
+            wrapped_actions.append([wrapped_action, wrapped_opponent_action])
     return wrapped_actions 
 
 
 class Runner:
 
-    def __init__(self, env, policy, buffer, local_epoch_step, logger, device, load_dir, n_rollout=6):
+    def __init__(self, env, policy, buffer, local_epoch_step, logger, device, load_dir, n_rollout, load_index):
         
         self.env = env
         self.policy = policy 
@@ -43,6 +46,7 @@ class Runner:
         self.load_dir = load_dir
         self.n_rollout = n_rollout
         self.save_index = []
+        self.load_index = load_index
 
     def rollout(self, epochs):
 
@@ -60,7 +64,7 @@ class Runner:
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
-                env_a = wrapped_action(a, action_opponent)
+                env_a = wrapped_action(a, action_opponent, self.ctrl_agent_index)
                 next_o, r, d, info = self.env.step(env_a)
                 next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
                 next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
@@ -115,17 +119,26 @@ class Runner:
             self.policy.learn(data)
             # Log info about epoch
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
-
+            self.ctrl_agent_index = np.random.randint(1,3) # random ctrl index
             if epoch % 50 == 0 or epoch == (epochs-1):
-                self.policy.save_models(epoch)
-                self.save_index.append(epoch)
+                self.policy.save_models(self.load_index+epoch)
+                self.save_index.append(self.load_index+epoch)
 
-            if epoch == 1000: # change the random agent to rl agent
-                state_shape = [1, 25, 25]
-                action_shape = 35
-                self.opponet = rl_agent(state_shape, action_shape, self.device)
-                load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
-                self.opponet.load_model(load_pth)
+            if self.load_index == 0: # if train from zero
+                if epoch == 1000:   # change the random agent to rl agent
+                    state_shape = [1, 25, 25] 
+                    action_shape = 35
+                    self.opponet = rl_agent(state_shape, action_shape, self.device)
+                    load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
+                    self.opponet.load_model(load_pth)
+
+            elif self.load_index > 0: # if train from load model
+                if epoch == 0: # load the model 
+                    state_shape = [1, 25, 25] 
+                    action_shape = 35
+                    self.opponet = rl_agent(state_shape, action_shape, self.device)
+                    load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
+                    self.opponet.load_model(load_pth)
 
             if epoch > 1000 and epoch % 50 == 0:
                 p = np.random.rand(1)

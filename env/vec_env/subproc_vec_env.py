@@ -8,7 +8,11 @@ def worker(remote, parent_remote, env_fn_wrappers):
     def step_env(env, action):
         ob, reward, done, _ , info = env.step(action)
         if done:
-            ob = env.reset()
+            p =  np.random.rand(1)  # choose if shuffle the map
+            if p > 0.5:
+                ob = env.reset(True)
+            else:
+                ob = env.reset(False)
         return ob, reward, done, info
 
     parent_remote.close()
