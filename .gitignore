@@ -12,5 +12,7 @@ baselines*
 data/
 wandb/
 agents/
+load_model/
+run.conf
 
 

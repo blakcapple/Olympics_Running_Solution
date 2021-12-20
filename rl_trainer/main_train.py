@@ -20,7 +20,8 @@ def build_env(args):
     def get_env_fn(rank):
         def init_env():
             env = make(args.game_name, args.seed + rank*1000)
-            env.specify_a_map(args.map) # specify a difficult map
+            if not args.shuffle:
+                env.specify_a_map(args.map) # specify a difficult map
             return env 
         return init_env 
     # if args.cpu == 1:

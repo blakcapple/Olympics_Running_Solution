@@ -87,11 +87,6 @@ class Runner:
                 # save and log
                 self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout,1), r[:, self.ctrl_agent_index], v, logp)
 
-                
-                # Update obs (critical!)
-                obs_ctrl_agent = next_obs_ctrl_agent
-                obs_oppo_agent = next_obs_oppo_agent
-
                 terminal = d 
                 epoch_ended = t==(self.local_steps_per_epoch-1)
 
@@ -114,12 +109,21 @@ class Runner:
                             wandb.log({'WinR':np.mean(record_win[-100:]), 'raw_reward':np.mean(ep_rets)})
                             # only save EpRet / EpLen if trajectory finished
                         ep_rets[index], ep_lens[index] = 0, 0
+                if epoch_ended:
+                    self.ctrl_agent_index = np.random.randint(0,2) # random ctrl index
+                    # reset the env
+                    next_o = self.env.reset()
+                    next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
+                    next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
+                # Update obs (critical!)
+                obs_ctrl_agent = next_obs_ctrl_agent
+                obs_oppo_agent = next_obs_oppo_agent
+
             # update policy
             data = self.buffer.get()
             self.policy.learn(data)
             # Log info about epoch
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
-            self.ctrl_agent_index = np.random.randint(0,1) # random ctrl index
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
