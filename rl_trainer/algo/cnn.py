@@ -30,13 +30,22 @@ class CNNLayer(nn.Module):
         input_height = state_shape[2]
         def init_(m):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain=gain)
-        cnn_out_size = self.out_channel * (input_width - self.kernel_size + self.stride) * (input_height - self.kernel_size + self.stride)
+        cnn1_out_shape = [input_width - self.kernel_size + self.stride, input_height - self.kernel_size + self.stride]
+        pool_out_shape = [int((cnn1_out_shape[0] - 2)/2) + 1, int((cnn1_out_shape[0] - 2)/2) + 1 ]
+        cnn2_out_shape = [pool_out_shape[0] - self.kernel_size + self.stride, pool_out_shape[1] - self.kernel_size + self.stride]
+        cnn_out_size = cnn2_out_shape[0] * cnn2_out_shape[1] * self.out_channel
+        pool = nn.AvgPool2d(kernel_size=2)
         self.cnn = nn.Sequential(
             init_(nn.Conv2d(in_channels=input_channel,
                             out_channels=self.out_channel,
                             kernel_size=self.kernel_size,
                             stride=self.stride)
                   ),
+            pool,
+            init_(nn.Conv2d(in_channels=self.out_channel,
+                            out_channels=self.out_channel,
+                            kernel_size=self.kernel_size,
+                            stride=self.stride)),
             active_func,
             Flatten(),
             init_(nn.Linear(cnn_out_size,

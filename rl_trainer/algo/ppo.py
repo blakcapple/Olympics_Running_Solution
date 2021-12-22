@@ -4,10 +4,11 @@ from torch.optim import Adam
 import os
 from copy import deepcopy
 import wandb
+import numpy as np 
 
 class PPO:
 
-    def __init__(self, state_shape, action_shape, pi_lr, v_lr, device, logger, clip_ratio=0.2, 
+    def __init__(self, state_shape, action_shape, pi_lr, v_lr, device, logger, max_size, batch_size, clip_ratio=0.2, 
                 train_pi_iters=80, train_v_iters=80, target_kl=0.01, max_grad_norm=0.5, save_dir='data/models'):
 
         self.ac = CNNActorCritic(state_shape, action_shape).to(device)
@@ -21,11 +22,14 @@ class PPO:
         self.check_point_dir = os.path.join(save_dir, 'models')
         os.makedirs(self.check_point_dir, exist_ok=True)
         self.max_grad_norm = max_grad_norm
+        self.max_size = max_size
+        self.batch_size = batch_size
 
     def compute_loss_pi(self, data):
         
         data = deepcopy(data)
-        obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
+        idxs = np.random.randint(0, self.max_size, self.batch_size)
+        obs, act, adv, logp_old = data['obs'][idxs], data['act'][idxs], data['adv'][idxs], data['logp'][idxs]
         obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
         act = act.view(-1, act.shape[2])
         adv = adv.view(-1)
@@ -47,7 +51,8 @@ class PPO:
     def compute_loss_v(self, data):
         
         data = deepcopy(data)
-        obs, ret = data['obs'], data['ret']
+        idxs = np.random.randint(0, self.max_size, self.batch_size)
+        obs, ret = data['obs'][idxs], data['ret'][idxs]
         obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
         ret = ret.view(-1)
 

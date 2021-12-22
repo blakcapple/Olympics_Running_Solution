@@ -41,11 +41,11 @@ def main(args):
     action_shape = 35
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('device', device)
+    local_epoch_step = args.epoch_step / args.cpu
     policy = PPO(state_shape, action_shape, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
                 logger=logger, clip_ratio=args.clip_ratio, train_pi_iters=args.train_pi_iters, 
                 train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, 
-                max_grad_norm=args.max_grad_norm)
-    local_epoch_step = args.epoch_step / args.cpu
+                max_grad_norm=args.max_grad_norm, max_size=int(local_epoch_step), batch_size=int(local_epoch_step/5))
     buffer = PPOBuffer(state_shape, 1, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
     if args.load:
         policy.load_models(args.load_dir, args.load_index)
