@@ -21,7 +21,7 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 class CNNLayer(nn.Module):
-
+    
     out_channel = 32
     hidden_size = 64
     kernel_size = 3
@@ -95,7 +95,7 @@ class CNNCategoricalActor(nn.Module):
         return pi, logp_a
 
     def save_model(self, pth):
-        torch.save(self.state_dict(), pth)
+        torch.save(self.state_dict(), pth, _use_new_zipfile_serialization=False)
 
     def load_model(self, pth):
         self.load_state_dict(torch.load(pth))
@@ -124,16 +124,21 @@ class RLAgent:
     def load_model(self, pth):
 
         self.actor.load_model(pth)
+    
+    def save_model(self, pth):
+
+        self.actor.save_model(pth)
 
 
 state_shape = [1, 25, 25]
 action_shape = 35
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1700.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_4649.pth"
 agent = RLAgent(state_shape, action_shape)
 agent.load_model(load_pth)
-load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_700.pth"
-agent_base = RLAgent(state_shape, action_shape)
-agent_base.load_model(load_path2)
+# agent.save_model(load_pth)
+# load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_700.pth"
+# agent_base = RLAgent(state_shape, action_shape)
+# agent_base.load_model(load_path2)
 
 def my_controller(observation_list, action_space_list, is_act_continuous):
     obs = observation_list['obs'].copy()
