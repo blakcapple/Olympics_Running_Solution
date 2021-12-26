@@ -45,7 +45,10 @@ class Runner:
         self.device = device
         self.load_index = load_index
         if self.load_index > 0:
-            self.opponet = deepcopy(self.policy)
+            state_shape = [1, 25, 25] 
+            action_shape = 35
+            self.opponet = rl_agent(state_shape, action_shape, self.device)
+            self.opponet.actor = deepcopy(policy.ac.pi)
         else:
             self.opponet = random_agent()
         self.load_dir = load_dir
