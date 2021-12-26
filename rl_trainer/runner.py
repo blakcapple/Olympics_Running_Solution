@@ -6,6 +6,7 @@ import time
 import os 
 import pdb
 import wandb
+from copy import deepcopy
 #dicretise action space
 actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
             7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
@@ -42,23 +43,29 @@ class Runner:
         self.best_ep_ret = -np.inf
         self.ctrl_agent_index = 1
         self.device = device
-        self.opponet = random_agent()
+        self.load_index = load_index
+        if self.load_index > 0:
+            self.opponet = deepcopy(self.policy)
+        else:
+            self.opponet = random_agent()
         self.load_dir = load_dir
         self.n_rollout = n_rollout
         self.save_index = []
-        self.load_index = load_index
 
     def rollout(self, epochs):
 
         o= self.env.reset()
         ep_lens = np.zeros(self.n_rollout)
         ep_rets = np.zeros(self.n_rollout)
-        obs_ctrl_agent = np.array(o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
-        obs_oppo_agent = np.array(o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
+        obs_ctrl = o[f'{self.ctrl_agent_index}']
+        obs_oppo = o[f'{1-self.ctrl_agent_index}']
+        obs_ctrl_agent = obs_ctrl.reshape(self.n_rollout, 1, 25, 25)
+        obs_oppo_agent = obs_oppo.reshape(self.n_rollout, 1, 25, 25)
         start_time = time.time()
         episode = 0
         record_win = []
         record_win_op = []
+        epoch_reward = []
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
             for t in range(self.local_steps_per_epoch):
@@ -66,9 +73,8 @@ class Runner:
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
                 env_a = wrapped_action(a, action_opponent, self.ctrl_agent_index)
                 next_o, r, d, info = self.env.step(env_a)
-                next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
-                next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
-                r = r.reshape(self.n_rollout, 2)
+                next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
                 for i, done in enumerate(d):
                     if not done:
                         r[i] = [-1, -1]
@@ -106,15 +112,15 @@ class Runner:
                             win_is_op = 1 if r[index][self.ctrl_agent_index] < r[index][1-self.ctrl_agent_index] else 0
                             record_win.append(win_is)
                             record_win_op.append(win_is_op)
-                            wandb.log({'WinR':np.mean(record_win[-100:]), 'raw_reward':np.mean(ep_rets)})
+                            epoch_reward.append(ep_rets[index])
                             # only save EpRet / EpLen if trajectory finished
                         ep_rets[index], ep_lens[index] = 0, 0
                 if epoch_ended:
                     self.ctrl_agent_index = np.random.randint(0,2) # random ctrl index
                     # reset the env
                     next_o = self.env.reset()
-                    next_obs_ctrl_agent = np.array(next_o[:, self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
-                    next_obs_oppo_agent = np.array(next_o[:, 1-self.ctrl_agent_index]).reshape(self.n_rollout, 1, 25, 25)
+                    next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                    next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
                 # Update obs (critical!)
                 obs_ctrl_agent = next_obs_ctrl_agent
                 obs_oppo_agent = next_obs_oppo_agent
@@ -123,37 +129,45 @@ class Runner:
             data = self.buffer.get()
             self.policy.learn(data)
             # Log info about epoch
+            wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)})
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
 
-            if self.load_index == 0: # if train from zero
-                if epoch == 1000:   # change the random agent to rl agent
-                    state_shape = [1, 25, 25] 
-                    action_shape = 35
-                    self.opponet = rl_agent(state_shape, action_shape, self.device)
-                    load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
-                    self.opponet.load_model(load_pth)
+            # if self.load_index == 0: # if train from zero
+            #     if epoch == 1000:   # change the random agent to rl agent
+            #         state_shape = [1, 25, 25] 
+            #         action_shape = 35
+            #         self.opponet = rl_agent(state_shape, action_shape, self.device)
+            #         load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
+            #         self.opponet.load_model(load_pth)
 
-            elif self.load_index > 0: # if train from load model
-                if epoch == 0: # load the model 
-                    state_shape = [1, 25, 25] 
-                    action_shape = 35
-                    self.opponet = rl_agent(state_shape, action_shape, self.device)
-                    load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
-                    self.opponet.load_model(load_pth)
+            # elif self.load_index > 0: # if train from load model
+            #     if epoch == 0: # load the model 
+            #         state_shape = [1, 25, 25] 
+            #         action_shape = 35
+            #         self.opponet = rl_agent(state_shape, action_shape, self.device)
+            #         load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
+            #         self.opponet.load_model(load_pth)
 
-            if epoch > 1000 and epoch % 50 == 0:
-                p = np.random.rand(1)
-                low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
-                if p > 0.7:
-                    index = self.save_index[-1]  # load the latest model
-                else:
-                    number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
-                    index = self.save_index[number]
-                load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
-                self.opponet.load_model(load_pth)  # load past model to self-play
-
+            # if epoch > 1000 and epoch % 50 == 0:
+            #     p = np.random.rand(1)
+            #     low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
+            #     if p > 0.7:
+            #         index = self.save_index[-1]  # load the latest model
+            #     else:
+            #         number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
+            #         index = self.save_index[number]
+            #     load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
+            #     self.opponet.load_model(load_pth)  # load past model to self-play
+            # load new model every 1000 times
+            if epoch % 1000 == 0 and  epoch > 0: 
+                load_index = self.save_index[-10]
+                state_shape = [1, 25, 25] 
+                action_shape = 35
+                self.opponet = rl_agent(state_shape, action_shape, self.device)
+                load_pth = os.path.join(self.load_dir, f'models/actor_{load_index}.pth')
+                self.opponet.load_model(load_pth)
             
 

@@ -60,9 +60,9 @@ class PPO:
 
     def learn(self, data):
 
-        pi_l_old, pi_info_old = self.compute_loss_pi(data)
-        pi_l_old = pi_l_old.item()
-        v_l_old = self.compute_loss_v(data).item()
+        # pi_l_old, pi_info_old = self.compute_loss_pi(data)
+        # pi_l_old = pi_l_old.item()
+        # v_l_old = self.compute_loss_v(data).item()
         # Train policy with multiple steps of gradient descent
         for i in range(self.train_pi_iters):
             self.pi_optimizer.zero_grad()
@@ -85,8 +85,8 @@ class PPO:
             self.v_optimizer.step()
 
         # Log changes from update
-        kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
-        wandb.log({'loss_pi':loss_pi, 'loss_v':loss_v})
+        kl = pi_info['kl']
+        wandb.log({'Loss_pi':loss_pi, 'Loss_v':loss_v, 'KL': kl})
 
     def save_models(self, index=None):
         

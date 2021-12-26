@@ -13,7 +13,9 @@ from runner import Runner
 import numpy as np
 from utils.log import init_log 
 from env.vec_env.subproc_vec_env import SubprocVecEnv
+from env.vec_env.schmem_vec_env import ShmemVecEnv
 import wandb
+from gym.spaces import Box, Dict
 
 
 def build_env(args):
@@ -27,7 +29,9 @@ def build_env(args):
     # if args.cpu == 1:
     #     return DummyVecEnv(get_env_fn(0))
     # else:
-    return SubprocVecEnv([get_env_fn(i) for i in range(args.cpu)])
+    space = Box(low=0, high=1, shape=(25, 25), dtype=np.float32)
+    dict = Dict({'0': space, '1': space})
+    return ShmemVecEnv([get_env_fn(i) for i in range(args.cpu)], spaces=dict)
 
 def main(args):
     # Random seed

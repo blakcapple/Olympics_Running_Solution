@@ -6,7 +6,6 @@ import multiprocessing as mp
 import numpy as np
 from .vec_env import VecEnv, CloudpickleWrapper, clear_mpi_env_vars
 import ctypes
-from baselines import logger
 
 from .util import dict_to_obs, obs_space_info, obs_to_dict
 
@@ -29,15 +28,8 @@ class ShmemVecEnv(VecEnv):
         """
         ctx = mp.get_context(context)
         if spaces:
-            observation_space, action_space = spaces
-        else:
-            logger.log('Creating dummy env object to get spaces')
-            with logger.scoped_configure(format_strs=[]):
-                dummy = env_fns[0]()
-                observation_space, action_space = dummy.observation_space, dummy.action_space
-                dummy.close()
-                del dummy
-        VecEnv.__init__(self, len(env_fns), observation_space, action_space)
+            observation_space = spaces
+        VecEnv.__init__(self, len(env_fns))
         self.obs_keys, self.obs_shapes, self.obs_dtypes = obs_space_info(observation_space)
         self.obs_bufs = [
             {k: ctx.Array(_NP_TO_CT[self.obs_dtypes[k].type], int(np.prod(self.obs_shapes[k]))) for k in self.obs_keys}
@@ -60,7 +52,6 @@ class ShmemVecEnv(VecEnv):
 
     def reset(self):
         if self.waiting_step:
-            logger.warn('Called reset() while waiting for the step to complete')
             self.step_wait()
         for pipe in self.parent_pipes:
             pipe.send(('reset', None))
@@ -110,7 +101,9 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
     shared memory.
     """
     def _write_obs(maybe_dict_obs):
-        flatdict = obs_to_dict(maybe_dict_obs)
+        dict = {"0": maybe_dict_obs[0]['obs'], "1": maybe_dict_obs[1]['obs']}
+        
+        flatdict = obs_to_dict(dict)
         for k in keys:
             dst = obs_bufs[k].get_obj()
             dst_np = np.frombuffer(dst, dtype=obs_dtypes[k]).reshape(obs_shapes[k])  # pylint: disable=W0212
@@ -124,9 +117,13 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
             if cmd == 'reset':
                 pipe.send(_write_obs(env.reset()))
             elif cmd == 'step':
-                obs, reward, done, info = env.step(data)
+                obs, reward, done, _, info = env.step(data)
                 if done:
-                    obs = env.reset()
+                    p =  np.random.rand(1)  # choose if shuffle the map
+                    if p > 0.5:
+                        obs = env.reset(True)
+                    else:
+                        obs = env.reset(False)
                 pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == 'render':
                 pipe.send(env.render(mode='rgb_array'))
@@ -137,5 +134,5 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
                 raise RuntimeError('Got unrecognized cmd %s' % cmd)
     except KeyboardInterrupt:
         print('ShmemVecEnv worker: got KeyboardInterrupt')
-    finally:
-        env.close()
+    # finally:
+    #     env.close()
