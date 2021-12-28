@@ -58,7 +58,7 @@ class PPO:
 
         return ((self.ac.v(obs) - ret)**2).mean()
 
-    def learn(self, data):
+    def learn(self, data, epoch):
 
         # pi_l_old, pi_info_old = self.compute_loss_pi(data)
         # pi_l_old = pi_l_old.item()
@@ -75,7 +75,7 @@ class PPO:
             loss_pi.backward()
             # torch.nn.utils.clip_grad_norm_(self.ac.pi.parameters(), self.max_grad_norm)
             self.pi_optimizer.step()
-        wandb.log({'stop_pi':i})
+        wandb.log({'stop_pi':i}, step=epoch)
         # Value function learning
         for i in range(self.train_v_iters):
             self.v_optimizer.zero_grad()
@@ -86,7 +86,7 @@ class PPO:
 
         # Log changes from update
         kl = pi_info['kl']
-        wandb.log({'Loss_pi':loss_pi, 'Loss_v':loss_v, 'KL': kl})
+        wandb.log({'Loss_pi':loss_pi, 'Loss_v':loss_v, 'KL': kl}, step=epoch)
 
     def save_models(self, index=None):
         

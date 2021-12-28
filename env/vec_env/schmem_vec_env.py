@@ -115,15 +115,11 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
         while True:
             cmd, data = pipe.recv()
             if cmd == 'reset':
-                pipe.send(_write_obs(env.reset()))
+                pipe.send(_write_obs(env.reset(True)))
             elif cmd == 'step':
                 obs, reward, done, _, info = env.step(data)
                 if done:
-                    p =  np.random.rand(1)  # choose if shuffle the map
-                    if p > 0.5:
-                        obs = env.reset(True)
-                    else:
-                        obs = env.reset(False)
+                    obs = env.reset(True)
                 pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == 'render':
                 pipe.send(env.render(mode='rgb_array'))

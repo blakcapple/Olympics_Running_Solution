@@ -130,9 +130,9 @@ class Runner:
 
             # update policy
             data = self.buffer.get()
-            self.policy.learn(data)
+            self.policy.learn(data, epoch)
             # Log info about epoch
-            wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)})
+            wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)}, step=epoch)
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
             if epoch % 50 == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
