@@ -42,7 +42,7 @@ def main(args):
     env = build_env(args)
 
     state_shape = [1, 25, 25]
-    action_shape = 35
+    action_shape = 121
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('device', device)
     local_epoch_step = args.epoch_step / args.cpu
