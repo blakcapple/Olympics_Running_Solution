@@ -40,8 +40,11 @@ class PPO:
         clip_adv = torch.clamp(ratio, 1-self.clip_ratio, 1+self.clip_ratio) * adv
         loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
         # Useful extra info
-        approx_kl = (logp_old - logp).mean().item()
+        # approx_kl = (logp_old - logp).mean().item()
+        log_ratio = logp - logp_old
+        approx_kl = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).item() # this is better(maybe)
         ent = pi.entropy().mean().item()
+        loss_pi -= 0*ent # add entropy loss may be better 
         clipped = ratio.gt(1+self.clip_ratio) | ratio.lt(1-self.clip_ratio)
         clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
         pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
