@@ -8,14 +8,7 @@ from tabulate import tabulate
 import argparse
 from torch.distributions import Categorical
 import os
-
-
-actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
-               7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
-               14: [20, -6], 15: [20, 6], 16: [20, 18], 17: [20, 30], 18: [80, -30], 19: [80, -18], 20: [80, -6],
-               21: [80, 6], 22: [80, 18], 23: [80, 30], 24: [140, -30], 25: [140, -18], 26: [140, -6], 27: [140, 6],
-               28: [140, 18], 29: [140, 30], 30: [200, -30], 31: [200, -18], 32: [200, -6], 33: [200, 6], 34: [200, 18],
-               35: [200, 30]}           #dicretise action space
+from gym.spaces import Box
 
 
 def get_join_actions(state, algo_list):
@@ -32,13 +25,25 @@ def get_join_actions(state, algo_list):
 
             obs = state[agent_idx]['obs']
             actions_raw = agent_base.choose_action(obs)
-            actions = actions_map[actions_raw.item()]
+            if agent_base.is_act_continuous:
+                action = np.clip(actions_raw, -1, 1)
+                high = agent.action_space.high
+                low = agent.action_space.low
+                actions = low + 0.5*(action + 1.0)*(high - low)
+            else:
+                actions = agent.actions_map[actions_raw.item()]
             joint_actions.append([[actions[0]], [actions[1]]])
 
         elif algo_list[agent_idx] == 'rl':
             obs = state[agent_idx]['obs']
             actions_raw = agent.choose_action(obs)
-            actions = actions_map[actions_raw.item()]
+            if agent.is_act_continuous:
+                action = np.clip(actions_raw, -1, 1)
+                high = agent.action_space.high
+                low = agent.action_space.low
+                actions = low + 0.5*(action + 1.0)*(high - low)
+            else:
+                actions = agent.actions_map[actions_raw.item()]
             joint_actions.append([[actions[0]], [actions[1]]])
 
     return joint_actions

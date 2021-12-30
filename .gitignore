@@ -11,7 +11,7 @@ olympics/test/.pytest_cache/
 baselines*
 data/
 wandb/
-agents/
+*.pth
 load_model/
 run.conf
 

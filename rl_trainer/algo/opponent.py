@@ -1,15 +1,9 @@
 import random
-from rl_trainer.algo.network import CNNCategoricalActor
+from rl_trainer.algo.network import CNNCategoricalActor, CNNGaussianActor
+from gym.spaces import Box, Discrete
 import torch 
 import torch.nn as nn
 
-#dicretise action space
-actions_map = {0: [-100, -30], 1: [-100, -18], 2: [-100, -6], 3: [-100, 6], 4: [-100, 18], 5: [-100, 30], 6: [-40, -30],
-            7: [-40, -18], 8: [-40, -6], 9: [-40, 6], 10: [-40, 18], 11: [-40, 30], 12: [20, -30], 13: [20, -18],
-            14: [20, -6], 15: [20, 6], 16: [20, 18], 17: [20, 30], 18: [80, -30], 19: [80, -18], 20: [80, -6],
-            21: [80, 6], 22: [80, 18], 23: [80, 30], 24: [140, -30], 25: [140, -18], 26: [140, -6], 27: [140, 6],
-            28: [140, 18], 29: [140, 30], 30: [200, -30], 31: [200, -18], 32: [200, -6], 33: [200, 6], 34: [200, 18],
-            35: [200, 30]} 
 
 class random_agent:
     def __init__(self, seed=None):
@@ -30,9 +24,12 @@ class random_agent:
 
 class rl_agent:
     
-    def __init__(self, state_shape, action_shape, device):
+    def __init__(self, state_shape, action_space, device):
         
-        self.actor = CNNCategoricalActor(state_shape, action_shape, nn.ReLU).to(device)
+        if isinstance(action_space, Box):
+            self.actor = CNNGaussianActor(state_shape, action_space.shape[0], nn.ReLU).to(device)
+        elif isinstance(action_space, Discrete):
+            self.actor = CNNCategoricalActor(state_shape, action_space.n, nn.ReLU).to(device)
 
     def act(self, obs):
 

@@ -5,6 +5,8 @@ from torch.distributions import Categorical, Normal
 from rl_trainer.algo.cnn import CNNLayer
 import os 
 import numpy as np 
+from gym.spaces import Box, Discrete
+
 
 def mlp(sizes, activation, output_activation=nn.Identity):
     layers = []
@@ -21,7 +23,8 @@ class CNNGaussianActor(nn.Module):
         self.act_dim = act_dim 
         self.cnn_layer = CNNLayer(input_shape)
         self.linear_layer = mlp([64]+[256]+[act_dim], activation, output_activation=nn.Tanh)
-        self.log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
+        log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
+        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.mu_net = nn.Sequential(self.cnn_layer, self.linear_layer)
         
     def distribution(self, obs):
@@ -39,7 +42,7 @@ class CNNGaussianActor(nn.Module):
         pi = self.distribution(obs)
         logp_a = None
         if act is not None:
-            logp_a = self.log_prob_from_distribution(pi, act.view(-1))
+            logp_a = self.log_prob_from_distribution(pi, act)
         return pi, logp_a
 
     def save_model(self, pth):
@@ -117,10 +120,13 @@ class CNNCritic(nn.Module):
 
 class CNNActorCritic(nn.Module):
     
-    def __init__(self, state_shape, action_shape, activation=nn.ReLU):
+    def __init__(self, state_shape, action_space, activation=nn.ReLU):
         super().__init__()
 
-        self.pi = CNNCategoricalActor(state_shape, action_shape, activation)
+        if isinstance(action_space, Box):
+            self.pi = CNNGaussianActor(state_shape, action_space.shape[0], activation)
+        elif isinstance(action_space, Discrete):
+            self.pi = CNNCategoricalActor(state_shape, action_space.n, activation)
         self.v = CNNCritic(state_shape, activation)
     
     def step(self, obs):

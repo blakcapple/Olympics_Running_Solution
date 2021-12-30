@@ -15,7 +15,7 @@ from utils.log import init_log
 from env.vec_env.subproc_vec_env import SubprocVecEnv
 from env.vec_env.schmem_vec_env import ShmemVecEnv
 import wandb
-from gym.spaces import Box, Dict
+from gym.spaces import Box, Dict, Discrete
 
 
 def build_env(args):
@@ -42,18 +42,24 @@ def main(args):
     env = build_env(args)
 
     state_shape = [1, 25, 25]
-    action_shape = 121
+    action_num = 121
+    if args.action_type == 1:
+        action_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))
+        act_dim = 2
+    elif args.action_type == 0:
+        action_space = Discrete(action_num)
+        act_dim = 1
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('device', device)
     local_epoch_step = args.epoch_step / args.cpu
-    policy = PPO(state_shape, action_shape, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
+    policy = PPO(state_shape, action_space, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device,
                 logger=logger, clip_ratio=args.clip_ratio, train_pi_iters=args.train_pi_iters, 
                 train_v_iters=args.train_v_iters, target_kl=args.target_kl, save_dir=args.save_dir, 
-                max_grad_norm=args.max_grad_norm, max_size=int(local_epoch_step), batch_size=int(local_epoch_step/5))
-    buffer = PPOBuffer(state_shape, 1, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
+                max_grad_norm=args.max_grad_norm, max_size=int(local_epoch_step), batch_size=int(local_epoch_step))
+    buffer = PPOBuffer(state_shape, act_dim, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
     if args.load:
         policy.load_models(args.load_dir, args.load_index)
-    runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu, args.load_index)
+    runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu, args.load_index, action_space, act_dim)
 
     runner.rollout(args.train_epoch)
 
