@@ -8,8 +8,9 @@ import numpy as np
 
 class PPO:
 
-    def __init__(self, state_shape, action_space, pi_lr, v_lr, device, logger, max_size, batch_size, clip_ratio=0.2, 
-                train_pi_iters=80, train_v_iters=80, target_kl=0.01, max_grad_norm=0.5, save_dir='data/models'):
+    def __init__(self, state_shape, action_space, pi_lr, v_lr, device, logger, max_size, 
+                batch_size, clip_ratio=0.2, entropy_c=0, train_pi_iters=80, train_v_iters=80, 
+                target_kl=0.01, max_grad_norm=0.5, save_dir='data/models'):
 
         self.ac = CNNActorCritic(state_shape, action_space).to(device)
         self.clip_ratio = clip_ratio
@@ -24,6 +25,7 @@ class PPO:
         self.max_grad_norm = max_grad_norm
         self.max_size = max_size
         self.batch_size = batch_size
+        self.entropy_c = entropy_c
 
     def compute_loss_pi(self, data):
         
@@ -44,7 +46,7 @@ class PPO:
         log_ratio = logp - logp_old
         approx_kl = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).item() # this is better(maybe)
         ent = pi.entropy().mean().item()
-        loss_pi -= 0*ent # add entropy loss may be better 
+        loss_pi -= self.entropy_c*ent # add entropy loss may be better 
         clipped = ratio.gt(1+self.clip_ratio) | ratio.lt(1-self.clip_ratio)
         clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
         pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
