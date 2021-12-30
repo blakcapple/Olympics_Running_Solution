@@ -31,13 +31,14 @@ def get_join_actions(state, algo_list):
                 low = agent.action_space.low
                 actions = low + 0.5*(action + 1.0)*(high - low)
             else:
-                actions = agent.actions_map[actions_raw.item()]
+                actions = agent_base.actions_map[actions_raw.item()]
             joint_actions.append([[actions[0]], [actions[1]]])
 
         elif algo_list[agent_idx] == 'rl':
             obs = state[agent_idx]['obs']
             actions_raw = agent.choose_action(obs)
             if agent.is_act_continuous:
+                actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
                 action = np.clip(actions_raw, -1, 1)
                 high = agent.action_space.high
                 low = agent.action_space.low

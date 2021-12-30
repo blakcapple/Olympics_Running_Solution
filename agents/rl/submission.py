@@ -165,18 +165,24 @@ class RLAgent:
         elif isinstance(action_space, Discrete):
             self.is_act_continuous = False
             self.actor = CNNCategoricalActor(state_shape, action_space.n, nn.ReLU)
+            if action_space.n == 36:
+                self.actor = CNNCategoricalActor(state_shape, 35, nn.ReLU)
+            num = action_space.n
             #dicretise action space
-            forces = np.linspace(-100, 200, num=11, endpoint=True)
-            thetas = np.linspace(-30, 30, num=11, endpoint=True)
+            forces = np.linspace(-100, 200, num=int(np.sqrt(num)), endpoint=True)
+            thetas = np.linspace(-30, 30, num=int(np.sqrt(num)), endpoint=True)
             actions = [[force, theta] for force in forces for theta in thetas]
-            actions_map = {i:actions[i] for i in range(121)}
+            actions_map = {i:actions[i] for i in range(num)}
             self.actions_map = actions_map
 
     def choose_action(self, obs):
 
         state = torch.from_numpy(obs).float().unsqueeze(0).unsqueeze(0)
-        pi, _ = self.actor(state)
-        a_raw = pi.sample()
+        if self.is_act_continuous:
+            a_raw = self.actor.mu_net(state)
+        else:
+            pi, _ = self.actor(state)
+            a_raw = pi.sample()
 
         return a_raw
 
@@ -194,20 +200,21 @@ state_shape = [1, 25, 25]
 action_num = 121
 continue_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))   
 discrete_space = Discrete(action_num)
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_950_1.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_600.pth"
 agent = RLAgent(state_shape, discrete_space)
 agent.load_model(load_pth)
 # agent.save_model(load_pth)
-# load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_700.pth"
-# agent_base = RLAgent(state_shape, action_shape)
-# agent_base.load_model(load_path2)
+action_num = 36
+discrete_space = Discrete(action_num)
+load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_950_1.pth"
+agent_base = RLAgent(state_shape, discrete_space)
+agent_base.load_model(load_path2)
 
-
-# for discrete space
 def my_controller(observation_list, action_space_list, is_act_continuous):
     obs = observation_list['obs'].copy()
     actions_raw = agent.choose_action(obs)
     if agent.is_act_continuous:
+        actions_raw = actions_raw.detach().cpu().numpy()
         action = np.clip(actions_raw, -1, 1)
         high = agent.action_space.high
         low = agent.action_space.low
