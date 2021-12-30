@@ -128,8 +128,6 @@ class Runner:
                     self.ctrl_agent_index = np.random.randint(0,2) # random ctrl index
                     # reset the env
                     next_o = self.env.reset()
-                    next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-                    next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
                 # Update obs (critical!)
                 next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
                 next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
