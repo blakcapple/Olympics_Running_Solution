@@ -24,8 +24,9 @@ def get_join_actions(state, algo_list):
         elif algo_list[agent_idx] == 'rl_base':
 
             obs = state[agent_idx]['obs']
-            actions_raw = agent_base.choose_action(obs)
+            actions_raw = agent_base.choose_action(obs, True)
             if agent_base.is_act_continuous:
+                actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
                 action = np.clip(actions_raw, -1, 1)
                 high = agent.action_space.high
                 low = agent.action_space.low
@@ -36,7 +37,7 @@ def get_join_actions(state, algo_list):
 
         elif algo_list[agent_idx] == 'rl':
             obs = state[agent_idx]['obs']
-            actions_raw = agent.choose_action(obs)
+            actions_raw = agent.choose_action(obs, False)
             if agent.is_act_continuous:
                 actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
                 action = np.clip(actions_raw, -1, 1)
@@ -130,5 +131,6 @@ if __name__ == "__main__":
     #random.seed(1)
 
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
+    agent_list = [args.my_ai, args.opponent]
     run_game(game, algo_list=agent_list, episode=args.episode, shuffle_map=shuffle,map_num=args.map,verbose=False)
 
