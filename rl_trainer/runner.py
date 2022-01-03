@@ -135,8 +135,7 @@ class Runner:
                 obs_oppo_agent = next_obs_oppo_agent
 
             # update policy
-            data = self.buffer.get()
-            self.policy.learn(data, epoch)
+            self.policy.learn(epoch)
             # Log info about epoch
             wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)}, step=epoch)
             epoch_reward = []
@@ -145,32 +144,6 @@ class Runner:
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
 
-            # if self.load_index == 0: # if train from zero
-            #     if epoch == 1000:   # change the random agent to rl agent
-            #         state_shape = [1, 25, 25] 
-            #         action_shape = 35
-            #         self.opponet = rl_agent(state_shape, action_shape, self.device)
-            #         load_pth = os.path.join(self.load_dir, 'models/actor_500.pth')
-            #         self.opponet.load_model(load_pth)
-
-            # elif self.load_index > 0: # if train from load model
-            #     if epoch == 0: # load the model 
-            #         state_shape = [1, 25, 25] 
-            #         action_shape = 35
-            #         self.opponet = rl_agent(state_shape, action_shape, self.device)
-            #         load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
-            #         self.opponet.load_model(load_pth)
-
-            # if epoch > 1000 and epoch % 50 == 0:
-            #     p = np.random.rand(1)
-            #     low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
-            #     if p > 0.7:
-            #         index = self.save_index[-1]  # load the latest model
-            #     else:
-            #         number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
-            #         index = self.save_index[number]
-            #     load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
-            #     self.opponet.load_model(load_pth)  # load past model to self-play
             # load new model every 1000 times
             if epoch % 1000 == 0 and  epoch > 0: 
                 load_index = self.save_index[-10]
@@ -185,4 +158,14 @@ class Runner:
                 load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
                 self.opponet.load_model(load_pth)
             
+            # if epoch > 1000 and epoch % 50 == 0:
+            #     p = np.random.rand(1)
+            #     low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
+            #     if p > 0.7:
+            #         index = self.save_index[-1]  # load the latest model
+            #     else:
+            #         number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
+            #         index = self.save_index[number]
+            #     load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
+            #     self.opponet.load_model(load_pth)  # load past model to self-play
 

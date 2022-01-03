@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.core.numeric import indices
 from algo.utils import combined_shape, discount_cumsum
 import torch 
 
@@ -22,6 +23,9 @@ class PPOBuffer:
         self.path_start_idx = np.zeros(n_rollout, dtype=int) # every rollout have different idx
         self.device = device
         self.n_rollout = n_rollout
+        self.generate_ready = False
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
 
     def store(self, obs, act, rew, val, logp):
         """
@@ -80,3 +84,74 @@ class PPOBuffer:
         data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
                     adv=self.adv_buf, logp=self.logp_buf)
         return {k: torch.as_tensor(v, dtype=torch.float32, device=self.device) for k,v in data.items()}
+    
+    def generate_data(self, batch_size):
+        """
+        randomly sample data from buffer , call this at the end of the epoch 
+        """
+        assert self.ptr == self.max_size
+        if not self.generate_ready:
+            # the next two lines implement the advantage normalization trick
+            adv_mean = np.mean(self.adv_buf)
+            adv_std = np.var(self.adv_buf)
+            self.adv_buf = (self.adv_buf - adv_mean) / adv_std
+            _tensor_names = [
+                "obs_buf",
+                "act_buf",
+                "ret_buf",
+                "adv_buf",
+                "logp_buf",
+            ]
+            for tensor in _tensor_names:
+                self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
+            self.generate_ready = True
+        indices = np.random.permutation(self.max_size*self.n_rollout)
+        # indices = np.arange(self.max_size*self.n_rollout)
+        start_idx = 0 
+        while start_idx < self.max_size*self.n_rollout:
+            yield self._get_samples(indices[start_idx:start_idx+batch_size])
+            start_idx += batch_size
+
+    def swap_and_flatten(self, arr):
+        """
+        Swap and then flatten axes 0 (buffer_size) and 1 (n_envs)
+        """
+        shape = arr.shape
+        if len(shape) < 3:
+            shape = shape + (1,)
+        return arr.swapaxes(0, 1).reshape(shape[0] * shape[1], *shape[2:])
+    
+    def _get_samples(self, indices):
+        
+        data = dict(obs=self.obs_buf[indices], 
+                    act=self.act_buf[indices], 
+                    ret=self.ret_buf[indices].flatten(),
+                    adv=self.adv_buf[indices].flatten(), 
+                    logp=self.logp_buf[indices].flatten(),)
+        
+        return {k: self.to_torch(v) for k,v in data.items()}
+    
+    def to_torch(self, array, copy=True):
+        
+        """
+        Convert a numpy array to a Pytorch Tensor
+        """
+        
+        if copy:
+            return torch.tensor(array).to(self.device)
+        return torch.as_tensor(array).to(self.device)
+    
+    def reset(self):
+        """
+        Call this to reset the buffer
+        """
+        self.obs_buf = np.zeros((self.max_size, self.n_rollout, *self.obs_dim), dtype=np.float32)
+        self.act_buf = np.zeros((self.max_size, self.n_rollout, self.act_dim), dtype=np.float32)
+        self.adv_buf = np.zeros((self.max_size, self.n_rollout), dtype=np.float32)
+        self.rew_buf = np.zeros((self.max_size, self.n_rollout), dtype=np.float32)
+        self.ret_buf = np.zeros((self.max_size, self.n_rollout), dtype=np.float32)
+        self.val_buf = np.zeros((self.max_size, self.n_rollout), dtype=np.float32)
+        self.logp_buf = np.zeros((self.max_size, self.n_rollout), dtype=np.float32)
+        self.ptr = 0
+        self.path_start_idx = np.zeros(self.n_rollout, dtype=int)
+        self.generate_ready = False

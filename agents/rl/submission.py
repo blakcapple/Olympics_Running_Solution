@@ -102,7 +102,7 @@ class CNNGaussianActor(nn.Module):
         return pi, logp_a
 
     def save_model(self, pth):
-        torch.save(self.state_dict(), pth)
+        torch.save(self.state_dict(), pth, _use_new_zipfile_serialization=False)
 
     def load_model(self, pth):
         self.load_state_dict(torch.load(pth))
@@ -142,7 +142,7 @@ class CNNCategoricalActor(nn.Module):
         return pi, logp_a
 
     def save_model(self, pth):
-        torch.save(self.state_dict(), pth)
+        torch.save(self.state_dict(), pth, _use_new_zipfile_serialization=False)
 
     def load_model(self, pth):
         self.load_state_dict(torch.load(pth))
@@ -204,16 +204,16 @@ class RLAgent:
 
 state_shape = [1, 25, 25]
 state_shape = [1, 25, 25]
-action_num = 121
+action_num = 49
 continue_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))   
 discrete_space = Discrete(action_num)
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_950.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1900.pth"
 agent = RLAgent(state_shape, discrete_space)
 agent.load_model(load_pth)
 # agent.save_model(load_pth)
-action_num = 121
+action_num = 36
 discrete_space = Discrete(action_num)
-load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/actor_950.pth"
+load_path2 = os.path.dirname(os.path.abspath(__file__)) + "/new_actor_1750.pth"
 agent_base = RLAgent(state_shape, discrete_space)
 agent_base.load_model(load_path2)
 

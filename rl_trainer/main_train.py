@@ -52,12 +52,12 @@ def main(args):
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print('device', device)
     local_epoch_step = args.epoch_step / args.cpu
-    policy = PPO(state_shape, action_space, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device, 
+    buffer = PPOBuffer(state_shape, act_dim, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
+    policy = PPO(state_shape, action_space, buffer, pi_lr=args.pi_lr, v_lr=args.v_lr, device=device, 
                 entropy_c = args.entropy_c,logger=logger, clip_ratio=args.clip_ratio, 
                 train_pi_iters=args.train_pi_iters, train_v_iters=args.train_v_iters, 
                 target_kl=args.target_kl, save_dir=args.save_dir, max_grad_norm=args.max_grad_norm, 
-                max_size=int(local_epoch_step), batch_size=int(local_epoch_step/args.mini_batch))
-    buffer = PPOBuffer(state_shape, act_dim, int(local_epoch_step), args.cpu, device, args.gamma, args.lamda)
+                max_size=int(local_epoch_step), batch_size=int(args.epoch_step/args.mini_batch))
     if args.load:
         policy.load_models(args.load_dir, args.load_index)
     runner = Runner(env, policy, buffer, int(local_epoch_step), logger, device, args.save_dir, args.cpu, args.load_index, action_space, act_dim)

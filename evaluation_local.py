@@ -126,9 +126,9 @@ if __name__ == "__main__":
     else:
         shuffle = True
 
-    #torch.manual_seed(1)
-    #np.random.seed(1)
-    #random.seed(1)
+    torch.manual_seed(2)
+    np.random.seed(2)
+    random.seed(2)
 
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
     agent_list = [args.my_ai, args.opponent]

@@ -5,10 +5,11 @@ import os
 from copy import deepcopy
 import wandb
 import numpy as np 
+import pdb
 
 class PPO:
 
-    def __init__(self, state_shape, action_space, pi_lr, v_lr, device, logger, max_size, 
+    def __init__(self, state_shape, action_space, buffer, pi_lr, v_lr, device, logger, max_size, 
                 batch_size, clip_ratio=0.2, entropy_c=0, train_pi_iters=80, train_v_iters=80, 
                 target_kl=0.01, max_grad_norm=0.5, save_dir='data/models'):
 
@@ -26,16 +27,16 @@ class PPO:
         self.max_size = max_size
         self.batch_size = batch_size
         self.entropy_c = entropy_c
+        self.buffer = buffer 
 
     def compute_loss_pi(self, data):
         
         data = deepcopy(data)
-        idxs = np.random.randint(0, self.max_size, self.batch_size)
-        obs, act, adv, logp_old = data['obs'][idxs], data['act'][idxs], data['adv'][idxs], data['logp'][idxs]
-        obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
-        act = act.view(-1, act.shape[2])
-        adv = adv.view(-1)
-        logp_old = logp_old.view(-1)
+        obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
+        # obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
+        # act = act.view(-1, act.shape[2])
+        # adv = adv.view(-1)
+        # logp_old = logp_old.view(-1)
         # Policy loss
         pi, logp = self.ac.pi(obs, act)
         ratio = torch.exp(logp - logp_old)
@@ -56,43 +57,42 @@ class PPO:
     def compute_loss_v(self, data):
         
         data = deepcopy(data)
-        idxs = np.random.randint(0, self.max_size, self.batch_size)
-        obs, ret = data['obs'][idxs], data['ret'][idxs]
-        obs = obs.view(-1, obs.shape[2], obs.shape[3], obs.shape[4])
-        ret = ret.view(-1)
+        obs, ret = data['obs'], data['ret']
 
         return ((self.ac.v(obs) - ret)**2).mean()
 
-    def learn(self, data, epoch):
+    def learn(self, epoch):
 
-        # pi_l_old, pi_info_old = self.compute_loss_pi(data)
-        # pi_l_old = pi_l_old.item()
-        # v_l_old = self.compute_loss_v(data).item()
         # Train policy with multiple steps of gradient descent
+        continue_train = True
         for i in range(self.train_pi_iters):
-            self.pi_optimizer.zero_grad()
-            loss_pi, pi_info = self.compute_loss_pi(data)
-            kl = pi_info['kl']
-            if kl > 1.5 * self.target_kl:
-                self.logger.info('Early stopping at step %d due to reaching max kl.'%i)
+            for data in self.buffer.generate_data(self.batch_size):
+                self.pi_optimizer.zero_grad()
+                loss_pi, pi_info = self.compute_loss_pi(data)
+                kl = pi_info['kl']
+                if kl > 1.5 * self.target_kl:
+                    self.logger.info('Early stopping at step %d due to reaching max kl.'%i)
+                    continue_train = False
+                    break
+                loss_pi.backward()
+                self.pi_optimizer.step()
+            if not continue_train:
                 break
-
-            loss_pi.backward()
-            # torch.nn.utils.clip_grad_norm_(self.ac.pi.parameters(), self.max_grad_norm)
-            self.pi_optimizer.step()
         wandb.log({'stop_pi':i}, step=epoch)
+
         # Value function learning
         for i in range(self.train_v_iters):
-            self.v_optimizer.zero_grad()
-            loss_v = self.compute_loss_v(data)
-            loss_v.backward()
-            torch.nn.utils.clip_grad_norm_(self.ac.v.parameters(), self.max_grad_norm)
-            self.v_optimizer.step()
+            for data in self.buffer.generate_data(self.batch_size):
+                self.v_optimizer.zero_grad()
+                loss_v = self.compute_loss_v(data)
+                loss_v.backward()
+                torch.nn.utils.clip_grad_norm_(self.ac.v.parameters(), self.max_grad_norm)
+                self.v_optimizer.step()
 
         # Log changes from update
         kl = pi_info['kl']
         wandb.log({'Loss_pi':loss_pi, 'Loss_v':loss_v, 'KL': kl}, step=epoch)
-
+        self.buffer.reset()
     def save_models(self, index=None):
         
         if index is not None:
