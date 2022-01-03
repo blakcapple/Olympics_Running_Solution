@@ -63,7 +63,7 @@ def main(args):
     if args.load:
         policy.load_models(args.load_dir, args.load_index)
         opponent = rl_agent(state_shape, action_space, device)
-        load_path = os.path.join(args.load_dir, f'models/actor_{args.load_opponent_index}.pth')
+        load_path = os.path.join(args.load_dir, f'actor_{args.load_opponent_index}.pth')
         opponent.load_model(load_path)
     else:
         opponent = random_agent(action_space)
