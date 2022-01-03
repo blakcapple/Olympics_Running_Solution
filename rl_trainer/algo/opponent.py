@@ -3,23 +3,28 @@ from rl_trainer.algo.network import CNNCategoricalActor, CNNGaussianActor
 from gym.spaces import Box, Discrete
 import torch 
 import torch.nn as nn
+import numpy as np 
 
 
 class random_agent:
-    def __init__(self, seed=None):
-        self.force_range = [-100, 200]
-        self.angle_range = [-30, 30]
-        #self.seed(seed)
+    def __init__(self, action_space, seed=0):
+
+        self.action_space = action_space
+        self.seed(seed)
 
     def seed(self, seed = None):
         random.seed(seed)
 
     def act(self, obs):
         actions = []
-        for _ in range(obs.shape[0]):
-            a = random.randint(0, 35)
-            actions.append(a)
-
+        if isinstance(self.action_space, Discrete):
+            for _ in range(obs.shape[0]):
+                a = random.randint(0, self.action_space.n-1)
+                actions.append(a)
+        if isinstance(self.action_space, Box):
+            for _ in range(obs.shape[0]):
+                a =  np.random.uniform([-1, -1], [1, 1])
+                actions.append(a)
         return actions
 
 class rl_agent:

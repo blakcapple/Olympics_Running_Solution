@@ -11,7 +11,9 @@ def read_args():
     parser.add_argument('--load', default=False, action='store_true')
     parser.add_argument('--load_dir', default='load_model', type=str)
     parser.add_argument('--load_index', default=0, type=int, help='which index to load')
+    parser.add_argument('--load_opponent_index', default=0, type=int, help='which index to load')
     parser.add_argument('--action_type', default=0, type=int, help='1 is continuous and 0 is discrete')
+    parser.add_argument('--action_num', default=49, type=int, help='how many different actions')
     # ppo parameters
     parser.add_argument('--pi_lr', default=3e-4, type=float)
     parser.add_argument('--v_lr', default=5e-4, type=float)

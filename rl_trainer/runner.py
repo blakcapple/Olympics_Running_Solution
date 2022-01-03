@@ -8,37 +8,11 @@ import pdb
 import wandb
 from copy import deepcopy
 from gym.spaces import Box, Discrete
-#dicretise action space
-forces = np.linspace(-100, 200, num=11, endpoint=True)
-thetas = np.linspace(-30, 30, num=11, endpoint=True)
-actions = [[force, theta] for force in forces for theta in thetas]
-actions_map = {i:actions[i] for i in range(121)}
-
-def wrapped_action(actions, opponent_actions, ctrl_agent_index, action_space):
-    wrapped_actions = []
-    for action, opponent_action in zip(actions, opponent_actions):
-        if isinstance(action_space, Discrete):
-            real_action = actions_map[action]
-            real_opponent_action = actions_map[opponent_action]
-        elif isinstance(action_space, Box):
-            action = np.clip(action, -1, 1)
-            opponent_action = np.clip(opponent_action, -1, 1)
-            high = action_space.high
-            low = action_space.low
-            real_action = low + 0.5*(action + 1.0)*(high - low)
-            real_opponent_action = low + 0.5*(opponent_action + 1.0)*(high - low)
-        wrapped_action = [[real_action[0]], [real_action[1]]]
-        wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
-        if ctrl_agent_index == 1:
-            wrapped_actions.append([wrapped_opponent_action, wrapped_action])
-        elif ctrl_agent_index == 0:
-            wrapped_actions.append([wrapped_action, wrapped_opponent_action])
-
-    return wrapped_actions
 
 class Runner:
 
-    def __init__(self, env, policy, buffer, local_epoch_step, logger, device, load_dir, n_rollout, load_index, action_space, act_dim):
+    def __init__(self, env, policy, opponent, buffer, local_epoch_step, logger, device, 
+                load_dir, n_rollout, load_index, action_space, act_dim):
         
         self.env = env
         self.policy = policy 
@@ -53,15 +27,45 @@ class Runner:
         self.load_index = load_index
         self.action_space = action_space
         self.act_dim = act_dim
-        if self.load_index > 0:
-            state_shape = [1, 25, 25] 
-            self.opponet = rl_agent(state_shape, self.action_space , self.device)
-            self.opponet.actor = deepcopy(policy.ac.pi)
-        else:
-            self.opponet = random_agent()
+        self.opponet = opponent
         self.load_dir = load_dir
         self.n_rollout = n_rollout
         self.save_index = []
+        if isinstance(action_space, Discrete):
+            self.actions_map = self._set_actions_map(action_space.n)
+        else:
+            self.actions_map = None
+    
+    def _set_actions_map(self, action_num):
+        #dicretise action space
+        forces = np.linspace(-100, 200, num=int(np.sqrt(action_num)), endpoint=True)
+        thetas = np.linspace(-30, 30, num=int(np.sqrt(action_num)), endpoint=True)
+        actions = [[force, theta] for force in forces for theta in thetas]
+        actions_map = {i:actions[i] for i in range(action_num)}
+        return actions_map
+    
+    def _wrapped_action(self, actions, opponent_actions):
+        
+        wrapped_actions = []
+        for action, opponent_action in zip(actions, opponent_actions):
+            if isinstance(self.action_space, Discrete):
+                real_action = self.actions_map[action]
+                real_opponent_action = self.actions_map[opponent_action]
+            elif isinstance(self.action_space, Box):
+                action = np.clip(action, -1, 1)
+                opponent_action = np.clip(opponent_action, -1, 1)
+                high = self.action_space.high
+                low = self.action_space.low
+                real_action = low + 0.5*(action + 1.0)*(high - low)
+                real_opponent_action = low + 0.5*(opponent_action + 1.0)*(high - low)
+            wrapped_action = [[real_action[0]], [real_action[1]]]
+            wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
+            if self.ctrl_agent_index == 1:
+                wrapped_actions.append([wrapped_opponent_action, wrapped_action])
+            elif self.ctrl_agent_index == 0:
+                wrapped_actions.append([wrapped_action, wrapped_opponent_action])
+
+        return wrapped_actions
 
     def rollout(self, epochs):
 
@@ -82,7 +86,7 @@ class Runner:
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
-                env_a = wrapped_action(a, action_opponent, self.ctrl_agent_index, self.action_space)
+                env_a = self._wrapped_action(a, action_opponent)
                 next_o, r, d, info = self.env.step(env_a)
                 for i, done in enumerate(d):
                     if not done:
@@ -145,18 +149,13 @@ class Runner:
                 self.save_index.append(self.load_index+epoch)
 
             # load new model every 1000 times
-            if epoch % 1000 == 0 and  epoch > 0: 
+            if epoch % 1000 == 0 and epoch > 0: 
                 load_index = self.save_index[-10]
                 state_shape = [1, 25, 25] 
                 self.opponet = rl_agent(state_shape, self.action_space, self.device)
                 load_pth = os.path.join(self.load_dir, f'models/actor_{load_index}.pth')
                 self.opponet.load_model(load_pth)
 
-            if self.load_index > 0 and epoch == 0:
-                state_shape = [1, 25, 25] 
-                self.opponet = rl_agent(state_shape, self.action_space, self.device)
-                load_pth = os.path.join(self.load_dir, f'models/actor_{self.load_index}.pth')
-                self.opponet.load_model(load_pth)
             
             # if epoch > 1000 and epoch % 50 == 0:
             #     p = np.random.rand(1)
