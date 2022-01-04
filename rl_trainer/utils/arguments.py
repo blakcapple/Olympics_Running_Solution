@@ -18,7 +18,7 @@ def read_args():
     parser.add_argument('--pi_lr', default=3e-4, type=float)
     parser.add_argument('--v_lr', default=5e-4, type=float)
     parser.add_argument('--mini_batch', default=1, type=int)
-    parser.add_argument('--entropy_c', default=0.01, type=float)
+    parser.add_argument('--entropy_c', default=0.0, type=float)
     parser.add_argument('--train_pi_iters', default=80, type=int)
     parser.add_argument('--train_v_iters', default=40, type=int)
     parser.add_argument('--lamda', default=0.97, type=float)

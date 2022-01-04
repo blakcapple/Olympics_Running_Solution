@@ -62,9 +62,12 @@ def main(args):
                 max_size=int(local_epoch_step), batch_size=int(args.epoch_step/args.mini_batch))
     if args.load:
         policy.load_models(args.load_dir, args.load_index)
-        opponent = rl_agent(state_shape, action_space, device)
-        load_path = os.path.join(args.load_dir, f'actor_{args.load_opponent_index}.pth')
-        opponent.load_model(load_path)
+        if args.load_opponent_index > 0:
+            opponent = rl_agent(state_shape, action_space, device)
+            load_path = os.path.join(args.load_dir, f'actor_{args.load_opponent_index}.pth')
+            opponent.load_model(load_path)
+        else:
+            opponent = random_agent(action_space)
     else:
         opponent = random_agent(action_space)
     runner = Runner(env, policy, opponent, buffer, int(local_epoch_step), logger, 

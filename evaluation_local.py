@@ -24,7 +24,7 @@ def get_join_actions(state, algo_list):
         elif algo_list[agent_idx] == 'rl_base':
 
             obs = state[agent_idx]['obs']
-            actions_raw = agent_base.choose_action(obs, True)
+            actions_raw = agent_base.choose_action(obs, False)
             if agent_base.is_act_continuous:
                 actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
                 action = np.clip(actions_raw, -1, 1)
@@ -37,7 +37,7 @@ def get_join_actions(state, algo_list):
 
         elif algo_list[agent_idx] == 'rl':
             obs = state[agent_idx]['obs']
-            actions_raw = agent.choose_action(obs, False)
+            actions_raw = agent.choose_action(obs, True)
             if agent.is_act_continuous:
                 actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
                 action = np.clip(actions_raw, -1, 1)
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--my_ai", default='rl', help='rl/random')
     parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
     parser.add_argument("--episode", default=20)
-    parser.add_argument("--map", default='all', help='1/2/3/4/all')
+    parser.add_argument("--map", default='6', help='1/2/3/4/all')
     args = parser.parse_args()
 
     env_type = "olympics-running"
@@ -126,11 +126,11 @@ if __name__ == "__main__":
     else:
         shuffle = True
 
-    torch.manual_seed(2)
-    np.random.seed(2)
-    random.seed(2)
+    torch.manual_seed(3)
+    np.random.seed(3)
+    random.seed(3)
 
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
-    agent_list = [args.my_ai, args.opponent]
+    # agent_list = [args.my_ai, args.opponent]
     run_game(game, algo_list=agent_list, episode=args.episode, shuffle_map=shuffle,map_num=args.map,verbose=False)
 
