@@ -3,11 +3,14 @@ import os
 from datetime import datetime
 
 
-def init_log(path:str):
-    	
+def init_log(path:str, name=None):
+
     # create unique directories
-	now = datetime.now().strftime("%b-%d_%H-%M-%S")  
-	save_path = os.path.join(path, now)
+	if name is None:
+		name = datetime.now().strftime("%b-%d_%H-%M-%S")  
+		save_path = os.path.join(path, name)
+	else:
+		save_path = os.path.join(path, name)
 	os.makedirs(save_path, exist_ok=True)
 	log_file = os.path.join(save_path, 'out.log')
 	# create logger

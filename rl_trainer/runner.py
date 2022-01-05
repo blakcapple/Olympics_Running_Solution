@@ -8,6 +8,7 @@ import pdb
 import wandb
 from copy import deepcopy
 from gym.spaces import Box, Discrete
+import re
 
 class Runner:
 
@@ -28,14 +29,35 @@ class Runner:
         self.action_space = action_space
         self.act_dim = act_dim
         self.opponet = opponent
-        self.load_dir = load_dir
+        self.load_dir = os.path.join(load_dir, 'models') # where to load models for opponent
         self.n_rollout = n_rollout
         self.save_index = []
+        if isinstance(self.opponet, rl_agent):
+            self.random_play_flag = False
+            self.self_play_flag = True  
+        else:
+            self.self_play_flag = False
+            self.random_play_flag = True
+        if self.self_play_flag:
+            self.begin_self_play = True
+        else:
+            self.begin_self_play = False
         if isinstance(action_space, Discrete):
             self.actions_map = self._set_actions_map(action_space.n)
         else:
             self.actions_map = None
-    
+        self._read_history_models() # read history models from dir
+        self.last_epoch = 0
+
+    def _read_history_models(self):
+        
+        number = re.compile(r'\d+')
+        files = os.listdir(self.load_dir)
+        for file in files:
+            index = number.findall(file)
+            self.save_index.append(int(index[0]))
+        self.save_index.sort() # from low to high sorting
+
     def _set_actions_map(self, action_num):
         #dicretise action space
         forces = np.linspace(-100, 200, num=int(np.sqrt(action_num)), endpoint=True)
@@ -83,6 +105,9 @@ class Runner:
         epoch_reward = []
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
+            if (self.load_index+epoch) > 2000 and not self.begin_self_play:
+                self.begin_self_play = True
+                self.self_play_flag = True
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
@@ -148,23 +173,30 @@ class Runner:
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
 
-            # load new model every 1000 times
-            if epoch % 1000 == 0 and epoch > 0: 
-                load_index = self.save_index[-10]
-                state_shape = [1, 25, 25] 
-                self.opponet = rl_agent(state_shape, self.action_space, self.device)
-                load_pth = os.path.join(self.load_dir, f'models/actor_{load_index}.pth')
-                self.opponet.load_model(load_pth)
+            if self.begin_self_play and epoch > 0:
+    
+                if self.self_play_flag:
+                    if (epoch - self.last_epoch) == 50:
+                        self.opponet = random_agent(self.action_space) # give agent a break
+                        self.self_play_flag = False
+                        self.random_play_flag = True
+                        self.last_epoch = epoch
 
-            
-            # if epoch > 1000 and epoch % 50 == 0:
-            #     p = np.random.rand(1)
-            #     low_number = max((len(self.save_index) - 10), 0) # the oldest model to self-play
-            #     if p > 0.7:
-            #         index = self.save_index[-1]  # load the latest model
-            #     else:
-            #         number = np.random.randint(low_number, len(self.save_index)-1) # load the history model
-            #         index = self.save_index[number]
-            #     load_pth = os.path.join(self.load_dir, f'models/actor_{index}.pth')
-            #     self.opponet.load_model(load_pth)  # load past model to self-play
+                elif self.random_play_flag:
+                    if (epoch - self.last_epoch) == 10:
+                        p = np.random.rand(1)
+                        low_number = max((len(self.save_index) - 30), 0) # the oldest model to self-play
+                        high_number = max((len(self.save_index) - 10), 1) # the newest model to self-play
+                        if p > 0.8:
+                            index = self.save_index[high_number]  # load the newest model
+                        else:
+                            number = np.random.randint(low_number, high_number) # load the history model
+                            index = self.save_index[number]
+                        state_shape = [1, 25, 25] 
+                        self.opponet = rl_agent(state_shape, self.action_space, self.device) 
+                        load_pth = os.path.join(self.load_dir, f'actor_{index}.pth')
+                        self.opponet.load_model(load_pth)
+                        self.self_play_flag = True
+                        self.random_play_flag = False
+                        self.last_epoch = epoch
 

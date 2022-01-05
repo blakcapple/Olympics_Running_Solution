@@ -78,7 +78,7 @@ def main(args):
 if __name__ == '__main__':
     wandb.init(project="Olympics_Running", entity="the-one")
     args = read_args()
-    logger, save_path, log_file = init_log(args.save_dir)
+    logger, save_path, log_file = init_log(args.save_dir, args.save_name)
     with open(save_path+'/arguments.txt', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
     # with open(save_path+'/arguments.txt', 'r') as f:

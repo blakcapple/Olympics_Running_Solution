@@ -28,6 +28,8 @@ def read_args():
     parser.add_argument('--max_grad_norm', default=0.5, type=float)
     parser.add_argument('--epoch_step', default=150, type=int)
     parser.add_argument('--save_dir', default='data', type=str)
+    parser.add_argument('--save_name', default=None, type=str)
+
 
     args = parser.parse_args()
 
