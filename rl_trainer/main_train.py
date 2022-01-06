@@ -33,7 +33,7 @@ def build_env(args):
     # else:
     space = Box(low=0, high=1, shape=(25, 25), dtype=np.float32)
     dict = Dict({'0': space, '1': space})
-    return ShmemVecEnv([get_env_fn(i) for i in range(args.cpu)], spaces=dict)
+    return ShmemVecEnv([get_env_fn(i) for i in range(args.cpu)], spaces=dict, penalty=args.energy_penalty)
 
 def main(args):
     # Random seed

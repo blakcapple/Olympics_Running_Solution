@@ -21,7 +21,7 @@ class ShmemVecEnv(VecEnv):
     Optimized version of SubprocVecEnv that uses shared variables to communicate observations.
     """
 
-    def __init__(self, env_fns, spaces=None, context='spawn'):
+    def __init__(self, env_fns, spaces=None, context='spawn', penalty=False):
         """
         If you don't specify observation_space, we'll have to create a dummy
         environment to get it.
@@ -41,7 +41,7 @@ class ShmemVecEnv(VecEnv):
                 wrapped_fn = CloudpickleWrapper(env_fn)
                 parent_pipe, child_pipe = ctx.Pipe()
                 proc = ctx.Process(target=_subproc_worker,
-                            args=(child_pipe, parent_pipe, wrapped_fn, obs_buf, self.obs_shapes, self.obs_dtypes, self.obs_keys))
+                            args=(child_pipe, parent_pipe, wrapped_fn, obs_buf, self.obs_shapes, self.obs_dtypes, self.obs_keys, penalty))
                 proc.daemon = True
                 self.procs.append(proc)
                 self.parent_pipes.append(parent_pipe)
@@ -95,7 +95,7 @@ class ShmemVecEnv(VecEnv):
         return dict_to_obs(result)
 
 
-def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs_dtypes, keys):
+def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs_dtypes, keys, penalty=False):
     """
     Control a single environment instance using IPC and
     shared memory.
@@ -118,6 +118,10 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
                 pipe.send(_write_obs(env.reset(True)))
             elif cmd == 'step':
                 obs, reward, done, _, info = env.step(data)
+                if penalty and not done:
+                    for i in range(2):
+                        if env.env_core.agent_list[i].is_fatigue:
+                            reward[i] -= 1 
                 if done:
                     obs = env.reset(True)
                 pipe.send((_write_obs(obs), reward, done, info))
