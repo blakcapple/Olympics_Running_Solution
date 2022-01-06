@@ -176,7 +176,7 @@ class Runner:
             if self.begin_self_play and epoch > 0:
     
                 if self.self_play_flag:
-                    if (epoch - self.last_epoch) == 50:
+                    if (epoch - self.last_epoch) == 40:
                         self.opponet = random_agent(self.action_space) # give agent a break
                         self.self_play_flag = False
                         self.random_play_flag = True
@@ -185,12 +185,14 @@ class Runner:
                 elif self.random_play_flag:
                     if (epoch - self.last_epoch) == 10:
                         p = np.random.rand(1)
-                        low_number = max((len(self.save_index) - 30), 0) # the oldest model to self-play
-                        high_number = max((len(self.save_index) - 10), 1) # the newest model to self-play
+                        low_number = max((len(self.save_index) - 40), 0) # the oldest model to self-play
+                        median_number = max((len(self.save_index) - 20), 1)
+                        high_number = max((len(self.save_index) - 10), 2) # the newest model to self-play
                         if p > 0.8:
-                            index = self.save_index[high_number]  # load the newest model
+                            number = np.random.randint(median_number, high_number)
+                            index = self.save_index[number]  # load the newer model 
                         else:
-                            number = np.random.randint(low_number, high_number) # load the history model
+                            number = np.random.randint(low_number, median_number) # load the older model 
                             index = self.save_index[number]
                         state_shape = [1, 25, 25] 
                         self.opponet = rl_agent(state_shape, self.action_space, self.device) 
