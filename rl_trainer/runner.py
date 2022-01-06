@@ -130,7 +130,10 @@ class Runner:
 
                 # save and log
                 self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout, self.act_dim), r[:, self.ctrl_agent_index], v, logp)
-
+                next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                obs_ctrl_agent = next_obs_ctrl_agent
+                obs_oppo_agent = next_obs_oppo_agent
                 terminal = d 
                 epoch_ended = t==(self.local_steps_per_epoch-1)
 
@@ -158,10 +161,10 @@ class Runner:
                     # reset the env
                     next_o = self.env.reset()
                 # Update obs (critical!)
-                next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-                next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-                obs_ctrl_agent = next_obs_ctrl_agent
-                obs_oppo_agent = next_obs_oppo_agent
+                    next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                    next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                    obs_ctrl_agent = next_obs_ctrl_agent
+                    obs_oppo_agent = next_obs_oppo_agent
 
             # update policy
             self.policy.learn(epoch)
