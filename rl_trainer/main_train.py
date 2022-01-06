@@ -70,8 +70,7 @@ def main(args):
             opponent = random_agent(action_space)
     else:
         opponent = random_agent(action_space)
-    runner = Runner(env, policy, opponent, buffer, int(local_epoch_step), logger, 
-                    device, args.save_dir, args.cpu, args.load_index, action_space, act_dim)
+    runner = Runner(args, env, policy, opponent, buffer, logger, device, action_space, act_dim)
 
     runner.rollout(args.train_epoch)
 
