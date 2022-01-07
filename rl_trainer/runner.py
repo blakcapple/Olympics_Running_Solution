@@ -164,10 +164,10 @@ class Runner:
                         if epoch_ended and not(done):
                             print('Warning: trajectory cut off by epoch at %d steps.'%ep_lens[index], flush=True)
                         # if trajectory didn't reach terminal state, bootstrap value target
-                        if epoch_ended:
-                            _, v, _ = self.policy.step(torch.as_tensor([obs_ctrl_agent[index]], dtype=torch.float32, device=self.device))
-                        else:
+                        if done:
                             v = 0
+                        else:
+                            _, v, _ = self.policy.step(torch.as_tensor([obs_ctrl_agent[index]], dtype=torch.float32, device=self.device))
                         self.buffer.finish_path(index, v)
                         if done:
                             episode +=1
