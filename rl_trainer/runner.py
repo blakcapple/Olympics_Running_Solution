@@ -57,11 +57,12 @@ class Runner:
 
     def _read_history_models(self):
         
-        number = re.compile(r'\d+')
+        patten = re.compile(r'actor_(?P<index>\d+)')
         files = os.listdir(self.load_dir)
         for file in files:
-            index = number.findall(file)
-            self.save_index.append(int(index[0]))
+            index = patten.findall(file)
+            if len(index) > 0 :
+                self.save_index.append(int(index[0]))
         self.save_index.sort() # from low to high sorting
 
     def _set_actions_map(self, action_num):
