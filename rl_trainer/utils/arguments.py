@@ -6,6 +6,7 @@ def read_args():
     parser.add_argument('--game_name', default="olympics-running", type=str)
     parser.add_argument('--algo', default="ppo", type=str, help="ppo/sac")
     parser.add_argument('--train_epoch', default=10000, type=int)
+    parser.add_argument('--randomplay_epoch', default=2000, type=int, help='the opponent is random agent')
     parser.add_argument('--seed', default=1, type=int)
     parser.add_argument('--cpu', type=int, default=3)
     parser.add_argument('--load', default=False, action='store_true')
@@ -31,6 +32,14 @@ def read_args():
     parser.add_argument('--eval_step', default=500, type=int)
     parser.add_argument('--save_dir', default='data', type=str)
     parser.add_argument('--save_name', default=None, type=str)
+    # interval parameters
+    parser.add_argument('--save_interval', default=50, type=int)
+    parser.add_argument('--eval_interval', default=250, type=int)
+    parser.add_argument('--selfplay_interval', default=40, type=int)
+    parser.add_argument('--randomplay_interval', default=10, type=int)
+
+
+
 
 
     args = parser.parse_args()

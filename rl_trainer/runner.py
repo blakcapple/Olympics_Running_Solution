@@ -20,6 +20,11 @@ class Runner:
         self.load_index = args.load_index
         self.local_steps_per_epoch = int(self.total_epoch_step / args.cpu)
         self.eval_step = args.eval_step
+        self.randomplay_epoch = args.randomplay_epoch
+        self.randomplay_interval = args.randomplay_interval
+        self.selfplay_interval = args.selfplay_interval
+        self.save_interval = args.save_interval
+        self.eval_interval = args.eval_interval
         self.env = env
         self.policy = policy 
         self.buffer = buffer
@@ -127,7 +132,7 @@ class Runner:
             o = self.env.reset()
             obs_ctrl_agent = o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
             obs_oppo_agent = o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-            if (self.load_index+epoch) > 2000 and not self.begin_self_play:
+            if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
                 self.begin_self_play = True
                 self.self_play_flag = True
             for t in range(self.local_steps_per_epoch):
@@ -185,25 +190,25 @@ class Runner:
             wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)}, step=epoch)
             epoch_reward = []
             self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
-            if epoch % 50 == 0 or epoch == (epochs-1):
+            if epoch % self.save_interval == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
 
             # eval the agent(assume the opponent is static)
-            if epoch % 250 == 0 or epoch == (epochs-1):
+            if epoch % self.eval_interval == 0 or epoch == (epochs-1):
                 self.eval(self.eval_step, epoch)
 
             if self.begin_self_play and epoch > 0:
     
                 if self.self_play_flag:
-                    if (epoch - self.last_epoch) == 40:
+                    if (epoch - self.last_epoch) == self.selfplay_interval:
                         self.opponet = random_agent(self.action_space) # give agent a break
                         self.self_play_flag = False
                         self.random_play_flag = True
                         self.last_epoch = epoch
 
                 elif self.random_play_flag:
-                    if (epoch - self.last_epoch) == 10:
+                    if (epoch - self.last_epoch) == self.randomplay_interval:
                         p = np.random.rand(1)
                         low_number = max((len(self.save_index) - 40), 0) # the oldest model to self-play
                         median_number = max((len(self.save_index) - 20), 1)
