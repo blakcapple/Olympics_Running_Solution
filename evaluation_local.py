@@ -112,9 +112,9 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--my_ai", default='rl', help='rl/random')
-    parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
+    parser.add_argument("--opponent", default='random', help='rl_base/random')
     parser.add_argument("--episode", default=20)
-    parser.add_argument("--map", default='9', help='1/2/3/4/all')
+    parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()
 
     env_type = "olympics-running"
@@ -132,6 +132,6 @@ if __name__ == "__main__":
     random.seed(seed)
 
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
-    agent_list = [args.my_ai, args.opponent]
+    # agent_list = [args.my_ai, args.opponent]
     run_game(game, algo_list=agent_list, episode=args.episode, shuffle_map=shuffle,map_num=args.map,verbose=False)
 
