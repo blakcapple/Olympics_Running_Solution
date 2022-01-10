@@ -31,7 +31,6 @@ class Runner:
         self.logger = logger 
         self.ep_ret_history = [] 
         self.best_ep_ret = -np.inf
-        self.ctrl_agent_index = 1
         self.device = device
         self.action_space = action_space
         self.act_dim = act_dim
@@ -89,14 +88,11 @@ class Runner:
                 real_opponent_action = low + 0.5*(opponent_action + 1.0)*(high - low)
             wrapped_action = [[real_action[0]], [real_action[1]]]
             wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
-            if self.ctrl_agent_index == 1:
-                wrapped_actions.append([wrapped_opponent_action, wrapped_action])
-            elif self.ctrl_agent_index == 0:
-                wrapped_actions.append([wrapped_action, wrapped_opponent_action])
+            wrapped_actions.append([wrapped_action, wrapped_opponent_action])
 
         return wrapped_actions
 
-    def _wrapped_eval_action(self, actions, ctrl_agent_index):
+    def _wrapped_eval_action(self, actions):
 
         wrapped_actions = []
         for action in actions:
@@ -109,10 +105,7 @@ class Runner:
                 real_action = low + 0.5*(action + 1.0)*(high - low)
             wrapped_action = [[real_action[0]], [real_action[1]]]
             wrapped_opponent_action = [[0], [0]]
-            if ctrl_agent_index == 1:
-                wrapped_actions.append([wrapped_opponent_action, wrapped_action])
-            elif ctrl_agent_index == 0:
-                wrapped_actions.append([wrapped_action, wrapped_opponent_action])
+            wrapped_actions.append([wrapped_action, wrapped_opponent_action])
 
         return wrapped_actions
 
@@ -125,14 +118,11 @@ class Runner:
         record_win = []
         record_win_op = []
         epoch_reward = []
+        o = self.env.reset()
+        obs_ctrl_agent = o['0'].reshape(self.n_rollout, 1, 25, 25)
+        obs_oppo_agent = o['1'].reshape(self.n_rollout, 1, 25, 25)
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
-            # random ctrl index
-            self.ctrl_agent_index = np.random.randint(0,2)
-            # reset the env
-            o = self.env.reset()
-            obs_ctrl_agent = o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-            obs_oppo_agent = o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
             if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
                 self.begin_self_play = True
                 self.self_play_flag = True
@@ -153,13 +143,13 @@ class Runner:
                             r[i][1] -=100
 
                 for i in range(self.n_rollout):
-                    ep_rets[i] += (r[i, self.ctrl_agent_index])
+                    ep_rets[i] += (r[i, 0])
                     ep_lens[i] +=1 
 
                 # save and log
-                self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout, self.act_dim), r[:, self.ctrl_agent_index], v, logp)
-                next_obs_ctrl_agent = next_o[f'{self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-                next_obs_oppo_agent = next_o[f'{1-self.ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
+                self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout, self.act_dim), r[:, 0], v, logp)
+                next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 1, 25, 25)
+                next_obs_oppo_agent = next_o['1'].reshape(self.n_rollout, 1, 25, 25)
                 obs_ctrl_agent = next_obs_ctrl_agent
                 obs_oppo_agent = next_obs_oppo_agent
                 terminal = d 
@@ -177,8 +167,8 @@ class Runner:
                         self.buffer.finish_path(index, v)
                         if done:
                             episode +=1
-                            win_is = 1 if r[index][self.ctrl_agent_index] > r[index][1-self.ctrl_agent_index] else 0
-                            win_is_op = 1 if r[index][self.ctrl_agent_index] < r[index][1-self.ctrl_agent_index] else 0
+                            win_is = 1 if r[index][0] > r[index][1] else 0
+                            win_is_op = 1 if r[index][0] < r[index][1] else 0
                             record_win.append(win_is)
                             record_win_op.append(win_is_op)
                             epoch_reward.append(ep_rets[index])
@@ -198,7 +188,11 @@ class Runner:
             # eval the agent(assume the opponent is static)
             if epoch % self.eval_interval == 0 or epoch == (epochs-1):
                 self.eval(self.eval_step, epoch)
-
+                # reset the env
+                o = self.env.reset()
+                obs_ctrl_agent = o['0'].reshape(self.n_rollout, 1, 25, 25)
+                obs_oppo_agent = o['1'].reshape(self.n_rollout, 1, 25, 25)
+                
             if self.begin_self_play and epoch > 0:
     
                 if self.self_play_flag:
@@ -211,9 +205,9 @@ class Runner:
                 elif self.random_play_flag:
                     if (epoch - self.last_epoch) == self.randomplay_interval:
                         p = np.random.rand(1)
-                        low_number = max((len(self.save_index) - 40), 0) # the oldest model to self-play
-                        median_number = max((len(self.save_index) - 20), 1)
-                        high_number = max((len(self.save_index) - 10), 2) # the newest model to self-play
+                        low_number = max((len(self.save_index) - 60), 0) # the oldest model to self-play
+                        median_number = max((len(self.save_index) - 40), 1)
+                        high_number = max((len(self.save_index) - 20), 2) # the newest model to self-play
                         if p > 0.8:
                             number = np.random.randint(median_number, high_number)
                             index = self.save_index[number]  # load the newer model 
@@ -237,37 +231,35 @@ class Runner:
         start_time = time.time()
         eval_win = []
         eval_reward = []
-        for i in range(2):
-            ctrl_agent_index = i
-            o= self.env.reset()
-            obs_ctrl = o[f'{ctrl_agent_index}']
-            obs_ctrl_agent = obs_ctrl.reshape(self.n_rollout, 1, 25, 25)
-            for _ in range(total_step):
-                a, _, _ = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
-                env_a = self._wrapped_eval_action(a, ctrl_agent_index)
-                next_o, r, d, _ = self.env.step(env_a)
-                for i, done in enumerate(d):
-                    if not done:
-                        r[i] = [-1, -1]
-                    if done:
-                        if r[i][0] == r[i][1]:
-                            r[i]=[-1., -1.]
-                        elif r[i][1] > r[i][0]:
-                            r[i][0] -= 100
-                        elif r[i][0] > r[i][1]:
-                            r[i][1] -=100
+        o = self.env.reset()
+        obs_ctrl = o['0']
+        obs_ctrl_agent = obs_ctrl.reshape(self.n_rollout, 1, 25, 25)
+        for _ in range(total_step):
+            a, _, _ = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
+            env_a = self._wrapped_eval_action(a)
+            next_o, r, d, _ = self.env.step(env_a)
+            for i, done in enumerate(d):
+                if not done:
+                    r[i] = [-1, -1]
+                if done:
+                    if r[i][0] == r[i][1]:
+                        r[i]=[-1., -1.]
+                    elif r[i][1] > r[i][0]:
+                        r[i][0] -= 100
+                    elif r[i][0] > r[i][1]:
+                        r[i][1] -=100
 
-                for i in range(self.n_rollout):
-                    ep_rets[i] += (r[i, ctrl_agent_index])
-                # Update obs (critical!)
-                next_obs_ctrl_agent = next_o[f'{ctrl_agent_index}'].reshape(self.n_rollout, 1, 25, 25)
-                obs_ctrl_agent = next_obs_ctrl_agent
-                terminal = d
-                for index, done in enumerate(terminal):
-                    if done:
-                        win_is = 1 if r[index][ctrl_agent_index] > r[index][1-ctrl_agent_index] else 0
-                        eval_win.append(win_is)
-                        eval_reward.append(ep_rets[index])
+            for i in range(self.n_rollout):
+                ep_rets[i] += (r[i, 0])
+            # Update obs (critical!)
+            next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 1, 25, 25)
+            obs_ctrl_agent = next_obs_ctrl_agent
+            terminal = d
+            for index, done in enumerate(terminal):
+                if done:
+                    win_is = 1 if r[index][0] > r[index][1] else 0
+                    eval_win.append(win_is)
+                    eval_reward.append(ep_rets[index])
         wandb.log({'EvalWinR':np.mean(eval_win), 'EvalReward':np.mean(eval_reward)}, step=epoch)
         self.logger.info(f'epoch:{epoch}, EvalWinR:{np.mean(eval_win)}, EvalReward:, {np.mean(eval_reward)}, time:{time.time() - start_time}')
 

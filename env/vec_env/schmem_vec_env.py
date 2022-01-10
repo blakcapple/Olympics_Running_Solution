@@ -36,12 +36,15 @@ class ShmemVecEnv(VecEnv):
             for _ in env_fns]
         self.parent_pipes = []
         self.procs = []
+        self.number = 0
         with clear_mpi_env_vars():
             for env_fn, obs_buf in zip(env_fns, self.obs_bufs):
+                self.number += 1
+                ctrl_index = int(self.number % 2)
                 wrapped_fn = CloudpickleWrapper(env_fn)
                 parent_pipe, child_pipe = ctx.Pipe()
                 proc = ctx.Process(target=_subproc_worker,
-                            args=(child_pipe, parent_pipe, wrapped_fn, obs_buf, self.obs_shapes, self.obs_dtypes, self.obs_keys, penalty))
+                            args=(child_pipe, parent_pipe, wrapped_fn, obs_buf, self.obs_shapes, self.obs_dtypes, self.obs_keys, ctrl_index, penalty))
                 proc.daemon = True
                 self.procs.append(proc)
                 self.parent_pipes.append(parent_pipe)
@@ -95,14 +98,17 @@ class ShmemVecEnv(VecEnv):
         return dict_to_obs(result)
 
 
-def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs_dtypes, keys, penalty=False):
+def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs_dtypes, keys, ctrl_index, penalty=False):
     """
     Control a single environment instance using IPC and
     shared memory.
     """
+    ctrl_index = ctrl_index # the index  of agent that we are controlling 
     def _write_obs(maybe_dict_obs):
-        dict = {"0": maybe_dict_obs[0]['obs'], "1": maybe_dict_obs[1]['obs']}
-        
+        if ctrl_index == 0:
+            dict = {"0": maybe_dict_obs[0]['obs'], "1": maybe_dict_obs[1]['obs']} # always make the ob of agent we control at first place
+        else:
+            dict = {"0": maybe_dict_obs[1]['obs'], "1": maybe_dict_obs[0]['obs']}
         flatdict = obs_to_dict(dict)
         for k in keys:
             dst = obs_bufs[k].get_obj()
@@ -115,14 +121,20 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
         while True:
             cmd, data = pipe.recv()
             if cmd == 'reset':
+                # ctrl_index = np.random.randint(0,2)
                 pipe.send(_write_obs(env.reset(True)))
             elif cmd == 'step':
+                if ctrl_index == 1:
+                    data.reverse() # put the action in the right place
                 obs, reward, done, _, info = env.step(data)
                 if penalty and not done:
                     for i in range(2):
                         if env.env_core.agent_list[i].is_fatigue:
-                            reward[i] -= 1 
+                            reward[i] -= 1
+                if ctrl_index == 1:
+                    reward.reverse() 
                 if done:
+                    # ctrl_index = np.random.randint(0,2)
                     obs = env.reset(True)
                 pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == 'render':
