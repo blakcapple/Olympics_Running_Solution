@@ -122,20 +122,23 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
             cmd, data = pipe.recv()
             if cmd == 'reset':
                 # ctrl_index = np.random.randint(0,2)
+                wait_is_fatigue = 0
                 pipe.send(_write_obs(env.reset(True)))
             elif cmd == 'step':
                 if ctrl_index == 1:
                     data.reverse() # put the action in the right place
                 obs, reward, done, _, info = env.step(data)
                 if penalty and not done:
-                    for i in range(2):
-                        if env.env_core.agent_list[i].is_fatigue:
-                            reward[i] -= 1
+                    if env.env_core.agent_list[ctrl_index].is_fatigue:
+                        wait_is_fatigue +=1
+                        if wait_is_fatigue == 3:
+                            done = True
                 if ctrl_index == 1:
                     reward.reverse() 
                 if done:
                     # ctrl_index = np.random.randint(0,2)
                     obs = env.reset(True)
+                    wait_is_fatigue = 0
                 pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == 'render':
                 pipe.send(env.render(mode='rgb_array'))

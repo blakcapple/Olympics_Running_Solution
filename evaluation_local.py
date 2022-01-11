@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--my_ai", default='rl', help='rl/random')
     parser.add_argument("--opponent", default='random', help='rl_base/random')
     parser.add_argument("--episode", default=20)
-    parser.add_argument("--map", default='all', help='1/2/3/4/all')
+    parser.add_argument("--map", default='6', help='1/2/3/4/all')
     args = parser.parse_args()
 
     env_type = "olympics-running"
