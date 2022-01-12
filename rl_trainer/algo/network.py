@@ -65,7 +65,7 @@ class CNNCategoricalActor(nn.Module):
         self.input_shape = input_shape
         self.act_dim = act_dim 
         self.cnn_layer = CNNLayer(input_shape)
-        self.linear_layer = mlp([64]+[256]+[act_dim], activation)
+        self.linear_layer = mlp([256]+[256]+[act_dim], activation)
         self.logits_net = nn.Sequential(self.cnn_layer, self.linear_layer)
         
     def distribution(self, obs):
@@ -105,7 +105,7 @@ class CNNCritic(nn.Module):
         super().__init__()
         self.input_shape = input_shape
         self.cnn_layer = CNNLayer(input_shape)
-        self.linear_layer = mlp([64]+[256]+[1], activation)
+        self.linear_layer = mlp([256]+[256]+[1], activation)
         self.v_net = nn.Sequential(self.cnn_layer, self.linear_layer)
 
     def forward(self, obs):
@@ -128,9 +128,9 @@ class CNNActorCritic(nn.Module):
         elif isinstance(action_space, Discrete):
             self.pi = CNNCategoricalActor(state_shape, action_space.n, activation)
         self.v = CNNCritic(state_shape, activation)
+        self.ob_sequence = None # the observation sequence (length:4)
     
     def step(self, obs):
-
         with torch.no_grad():
             pi = self.pi.distribution(obs)
             a = pi.sample()

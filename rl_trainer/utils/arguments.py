@@ -8,7 +8,7 @@ def read_args():
     parser.add_argument('--train_epoch', default=10000, type=int)
     parser.add_argument('--randomplay_epoch', default=2000, type=int, help='the opponent is random agent')
     parser.add_argument('--seed', default=1, type=int)
-    parser.add_argument('--cpu', type=int, default=3)
+    parser.add_argument('--cpu', type=int, default=1)
     parser.add_argument('--load', default=False, action='store_true')
     parser.add_argument('--load_dir', default='load_model', type=str)
     parser.add_argument('--load_index', default=0, type=int, help='which index to load')

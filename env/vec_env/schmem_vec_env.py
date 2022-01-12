@@ -104,16 +104,32 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
     shared memory.
     """
     ctrl_index = ctrl_index # the index  of agent that we are controlling 
-    def _write_obs(maybe_dict_obs):
+    def _write_obs(maybe_dict_obs, obs_sequence_dict):
         if ctrl_index == 0:
-            dict = {"0": maybe_dict_obs[0]['obs'], "1": maybe_dict_obs[1]['obs']} # always make the ob of agent we control at first place
+            ob_ctrl = maybe_dict_obs[0]['obs']
+            ob_oppo = maybe_dict_obs[1]['obs']
+        if ctrl_index == 1:
+            ob_ctrl = maybe_dict_obs[1]['obs']
+            ob_oppo = maybe_dict_obs[0]['obs']
+        ob_ctrl = ob_ctrl.reshape(1, *ob_ctrl.shape)
+        ob_oppo = ob_oppo.reshape(1, *ob_oppo.shape)
+        if obs_sequence_dict is not None:
+            obs_sequence1 = np.concatenate((np.delete(obs_sequence_dict['0'], 0, axis=0), ob_ctrl), axis=0)
+            obs_sequence2 = np.concatenate((np.delete(obs_sequence_dict['1'], 0, axis=0), ob_oppo), axis=0)
+            # a = obs_sequence_dict['0'][1]
+            # b = obs_sequence1[0]
+            # assert((a==b).all())
+            # assert((ob_ctrl==obs_sequence1[-1]).all())
         else:
-            dict = {"0": maybe_dict_obs[1]['obs'], "1": maybe_dict_obs[0]['obs']}
+            obs_sequence1 = np.repeat(ob_ctrl, 4, axis=0)
+            obs_sequence2 = np.repeat(ob_oppo, 4, axis=0)
+        dict = {"0": obs_sequence1, "1": obs_sequence2}
         flatdict = obs_to_dict(dict)
         for k in keys:
             dst = obs_bufs[k].get_obj()
             dst_np = np.frombuffer(dst, dtype=obs_dtypes[k]).reshape(obs_shapes[k])  # pylint: disable=W0212
             np.copyto(dst_np, flatdict[k])
+        return dict
 
     env = env_fn_wrapper.x()
     parent_pipe.close()
@@ -123,7 +139,8 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
             if cmd == 'reset':
                 # ctrl_index = np.random.randint(0,2)
                 wait_is_fatigue = 0
-                pipe.send(_write_obs(env.reset(True)))
+                last_obs_sequence_dict = _write_obs(env.reset(True), None)
+                pipe.send(None)
             elif cmd == 'step':
                 if ctrl_index == 1:
                     data.reverse() # put the action in the right place
@@ -139,7 +156,10 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
                     # ctrl_index = np.random.randint(0,2)
                     obs = env.reset(True)
                     wait_is_fatigue = 0
-                pipe.send((_write_obs(obs), reward, done, info))
+                    last_obs_sequence_dict = None
+                obs_sequence_dict = _write_obs(obs, last_obs_sequence_dict)
+                last_obs_sequence_dict = obs_sequence_dict
+                pipe.send((1, reward, done, info))
             elif cmd == 'render':
                 pipe.send(env.render(mode='rgb_array'))
             elif cmd == 'close':

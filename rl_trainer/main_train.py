@@ -31,7 +31,7 @@ def build_env(args):
     # if args.cpu == 1:
     #     return DummyVecEnv(get_env_fn(0))
     # else:
-    space = Box(low=0, high=1, shape=(25, 25), dtype=np.float32)
+    space = Box(low=0, high=1, shape=(4, 25, 25), dtype=np.float32)
     dict = Dict({'0': space, '1': space})
     return ShmemVecEnv([get_env_fn(i) for i in range(args.cpu)], spaces=dict, penalty=args.energy_penalty)
 
@@ -43,7 +43,7 @@ def main(args):
 
     env = build_env(args)
 
-    state_shape = [1, 25, 25]
+    state_shape = [4, 25, 25]
     action_num = args.action_num
     if args.action_type == 1:
         action_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))

@@ -119,8 +119,8 @@ class Runner:
         record_win_op = []
         epoch_reward = []
         o = self.env.reset()
-        obs_ctrl_agent = o['0'].reshape(self.n_rollout, 1, 25, 25)
-        obs_oppo_agent = o['1'].reshape(self.n_rollout, 1, 25, 25)
+        obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
+        obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
             if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
@@ -148,8 +148,8 @@ class Runner:
 
                 # save and log
                 self.buffer.store(obs_ctrl_agent, a.reshape(self.n_rollout, self.act_dim), r[:, 0], v, logp)
-                next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 1, 25, 25)
-                next_obs_oppo_agent = next_o['1'].reshape(self.n_rollout, 1, 25, 25)
+                next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 4, 25, 25)
+                next_obs_oppo_agent = next_o['1'].reshape(self.n_rollout, 4, 25, 25)
                 obs_ctrl_agent = next_obs_ctrl_agent
                 obs_oppo_agent = next_obs_oppo_agent
                 terminal = d 
@@ -190,8 +190,8 @@ class Runner:
                 self.eval(self.eval_step, epoch)
                 # reset the env
                 o = self.env.reset()
-                obs_ctrl_agent = o['0'].reshape(self.n_rollout, 1, 25, 25)
-                obs_oppo_agent = o['1'].reshape(self.n_rollout, 1, 25, 25)
+                obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
+                obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
                 
             if self.begin_self_play and epoch > 0:
     
@@ -233,7 +233,7 @@ class Runner:
         eval_reward = []
         o = self.env.reset()
         obs_ctrl = o['0']
-        obs_ctrl_agent = obs_ctrl.reshape(self.n_rollout, 1, 25, 25)
+        obs_ctrl_agent = obs_ctrl.reshape(self.n_rollout, 4, 25, 25)
         for _ in range(total_step):
             a, _, _ = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
             env_a = self._wrapped_eval_action(a)
@@ -252,7 +252,7 @@ class Runner:
             for i in range(self.n_rollout):
                 ep_rets[i] += (r[i, 0])
             # Update obs (critical!)
-            next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 1, 25, 25)
+            next_obs_ctrl_agent = next_o['0'].reshape(self.n_rollout, 4, 25, 25)
             obs_ctrl_agent = next_obs_ctrl_agent
             terminal = d
             for index, done in enumerate(terminal):
