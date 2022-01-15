@@ -2,14 +2,14 @@
 import numpy as np
 import torch
 import random
-from agents.rl.submission import agent, agent_base
+from agents.rl.new_model import agent
+from agents.rl.old_model import agent as agent_base
 from env.chooseenv import make
 from tabulate import tabulate
 import argparse
 from torch.distributions import Categorical
 import os
 from gym.spaces import Box
-
 
 def get_join_actions(state, algo_list):
 
@@ -65,6 +65,7 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
         episode_reward = np.zeros(2)
 
         state = env.reset(shuffle_map)
+        obs_sequence = None
         if RENDER:
             env.env_core.render()
 
@@ -79,6 +80,7 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
                 env.env_core.render()
 
             if done:
+                agent.obs_sequence = None
                 if reward[0] != reward[1]:
                     if reward[0]==100:
                         num_win[0] +=1
@@ -112,9 +114,9 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--my_ai", default='rl', help='rl/random')
-    parser.add_argument("--opponent", default='random', help='rl_base/random')
+    parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
     parser.add_argument("--episode", default=20)
-    parser.add_argument("--map", default='6', help='1/2/3/4/all')
+    parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()
 
     env_type = "olympics-running"
@@ -126,12 +128,12 @@ if __name__ == "__main__":
     else:
         shuffle = True
 
-    seed = np.random.randint(1, 1000)
+    seed = np.random.randint(1, 49)
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-
+    
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
-    # agent_list = [args.my_ai, args.opponent]
+    agent_list = [args.my_ai, args.opponent]
     run_game(game, algo_list=agent_list, episode=args.episode, shuffle_map=shuffle,map_num=args.map,verbose=False)
 

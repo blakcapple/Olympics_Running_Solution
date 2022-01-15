@@ -123,9 +123,13 @@ class Runner:
         obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
+            o = self.env.reset()
+            obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
+            obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
             if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
                 self.begin_self_play = True
                 self.self_play_flag = True
+                self.last_epoch = 0
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
@@ -196,14 +200,14 @@ class Runner:
             if self.begin_self_play and epoch > 0:
     
                 if self.self_play_flag:
-                    if (epoch - self.last_epoch) == self.selfplay_interval:
+                    if ((epoch - self.last_epoch) >= self.selfplay_interval and np.mean(record_win[-1000:]) > 0.9) or (epoch - self.last_epoch) > 500:
                         self.opponet = random_agent(self.action_space) # give agent a break
                         self.self_play_flag = False
                         self.random_play_flag = True
                         self.last_epoch = epoch
 
                 elif self.random_play_flag:
-                    if (epoch - self.last_epoch) == self.randomplay_interval:
+                    if ((epoch - self.last_epoch) >= self.randomplay_interval) and record_win[-1000:] > 0.98:
                         p = np.random.rand(1)
                         low_number = max((len(self.save_index) - 60), 0) # the oldest model to self-play
                         median_number = max((len(self.save_index) - 40), 1)
@@ -260,6 +264,7 @@ class Runner:
                     win_is = 1 if r[index][0] > r[index][1] else 0
                     eval_win.append(win_is)
                     eval_reward.append(ep_rets[index])
+                    ep_rets[index] = 0
         wandb.log({'EvalWinR':np.mean(eval_win), 'EvalReward':np.mean(eval_reward)}, step=epoch)
         self.logger.info(f'epoch:{epoch}, EvalWinR:{np.mean(eval_win)}, EvalReward:, {np.mean(eval_reward)}, time:{time.time() - start_time}')
 

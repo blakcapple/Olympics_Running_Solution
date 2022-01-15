@@ -1,4 +1,3 @@
-
 import torch.nn as nn
 import torch 
 import os
@@ -19,7 +18,7 @@ class Flatten(nn.Module):
 class CNNLayer(nn.Module):
     
     out_channel = 32
-    hidden_size = 256
+    hidden_size = 64
     kernel_size = 3
     stride = 1
     use_Relu = True
@@ -55,14 +54,12 @@ class CNNLayer(nn.Module):
                             stride=self.stride)),
             active_func,
             Flatten(),
+            init_(nn.Linear(cnn_out_size,
+                            self.hidden_size)),
+                            active_func,
                             )
-        with torch.no_grad():
-            dummy_ob = torch.ones(1, input_channel, input_width, input_height).float()
-            n_flatten = self.cnn(dummy_ob).shape[1] # 6400
-        self.linear = nn.Sequential(init_(nn.Linear(n_flatten, self.hidden_size)), nn.ReLU())
     def forward(self, input):
-        cnn_output = self.cnn(input)
-        output = self.linear(cnn_output)
+        output = self.cnn(input)
         return output
     
 ###
@@ -81,7 +78,7 @@ class CNNGaussianActor(nn.Module):
         self.input_shape = input_shape
         self.act_dim = act_dim 
         self.cnn_layer = CNNLayer(input_shape)
-        self.linear_layer = mlp([256]+[256]+[act_dim], activation, output_activation=nn.Tanh)
+        self.linear_layer = mlp([64]+[256]+[act_dim], activation, output_activation=nn.Tanh)
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.mu_net = nn.Sequential(self.cnn_layer, self.linear_layer)
@@ -124,7 +121,7 @@ class CNNCategoricalActor(nn.Module):
         self.input_shape = input_shape
         self.act_dim = act_dim 
         self.cnn_layer = CNNLayer(input_shape)
-        self.linear_layer = mlp([256]+[256]+[act_dim], activation)
+        self.linear_layer = mlp([64]+[256]+[act_dim], activation)
         self.logits_net = nn.Sequential(self.cnn_layer, self.linear_layer)
         
     def distribution(self, obs):
@@ -177,27 +174,22 @@ class RLAgent:
             actions = [[force, theta] for force in forces for theta in thetas]
             actions_map = {i:actions[i] for i in range(num)}
             self.actions_map = actions_map
-        self.obs_sequence = None
 
     def choose_action(self, obs, deterministic=False):
-        state = torch.from_numpy(obs).float().unsqueeze(0) # [1, 25, 25]
-        if self.obs_sequence is not None:
-            self.obs_sequence = torch.cat((self.obs_sequence[1:, :, :], state), dim=0) #[4, 25, 25]
-        else:
-            self.obs_sequence = state.repeat(4, 1, 1) # [4, 25, 25]
-        obs_sequence  = self.obs_sequence.unsqueeze(0)
+
+        state = torch.from_numpy(obs).float().unsqueeze(0).unsqueeze(0)
         if self.is_act_continuous:
             if deterministic:
-                a_raw = self.actor.mu_net(obs_sequence)
+                a_raw = self.actor.mu_net(state)
             else:
-                pi, _ = self.actor(obs_sequence)
+                pi, _ = self.actor(state)
                 a_raw = pi.sample()
         else:
             if deterministic:
-                logits = self.actor.logits_net(obs_sequence)
+                logits = self.actor.logits_net(state)
                 a_raw = torch.argmax(logits)
             else:
-                pi, _ = self.actor(obs_sequence)
+                pi, _ = self.actor(state)
                 a_raw = pi.sample()
 
         return a_raw
@@ -210,28 +202,12 @@ class RLAgent:
 
         self.actor.save_model(pth)
 
-state_shape = [4, 25, 25]
-state_shape = [4, 25, 25]
+state_shape = [1, 25, 25]
+state_shape = [1, 25, 25]
 action_num = 121
 continue_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))   
 discrete_space = Discrete(action_num)
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1650.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_4550.pth"
 agent = RLAgent(state_shape, discrete_space)
 agent.load_model(load_pth)
 # agent.save_model(load_pth)
-
-
-def my_controller(observation_list, action_space_list, is_act_continuous):
-    obs = observation_list['obs'].copy()
-    actions_raw = agent.choose_action(obs, True)
-    if agent.is_act_continuous:
-        actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
-        action = np.clip(actions_raw, -1, 1)
-        high = agent.action_space.high
-        low = agent.action_space.low
-        actions = low + 0.5*(action + 1.0)*(high - low)
-    else:
-        actions = agent.actions_map[actions_raw.item()]
-    wrapped_actions = [[actions[0]], [actions[1]]]
-    return wrapped_actions
-

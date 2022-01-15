@@ -1,4 +1,3 @@
-
 import torch.nn as nn
 import torch 
 import os
@@ -219,19 +218,3 @@ load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1650.pth"
 agent = RLAgent(state_shape, discrete_space)
 agent.load_model(load_pth)
 # agent.save_model(load_pth)
-
-
-def my_controller(observation_list, action_space_list, is_act_continuous):
-    obs = observation_list['obs'].copy()
-    actions_raw = agent.choose_action(obs, True)
-    if agent.is_act_continuous:
-        actions_raw = actions_raw.detach().cpu().numpy().reshape(-1)
-        action = np.clip(actions_raw, -1, 1)
-        high = agent.action_space.high
-        low = agent.action_space.low
-        actions = low + 0.5*(action + 1.0)*(high - low)
-    else:
-        actions = agent.actions_map[actions_raw.item()]
-    wrapped_actions = [[actions[0]], [actions[1]]]
-    return wrapped_actions
-

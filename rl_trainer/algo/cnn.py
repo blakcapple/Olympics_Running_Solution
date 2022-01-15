@@ -35,20 +35,21 @@ class CNNLayer(nn.Module):
         # pool_out_shape = [int((cnn1_out_shape[0] - 2)/2) + 1, int((cnn1_out_shape[0] - 2)/2) + 1 ]
         # cnn2_out_shape = [pool_out_shape[0] - self.kernel_size + self.stride, pool_out_shape[1] - self.kernel_size + self.stride]
         # # cnn_out_size = cnn2_out_shape[0] * cnn2_out_shape[1] * self.out_channel
-        # # pool = nn.AvgPool2d(kernel_size=2)
+        pool = nn.AvgPool2d(kernel_size=2)
         self.cnn = nn.Sequential(
             init_(nn.Conv2d(in_channels=input_channel,
-                            out_channels=32,
-                            kernel_size=3,
-                            stride=2)
+                            out_channels=self.out_channel,
+                            kernel_size=self.kernel_size,
+                            stride=self.stride)
                   ),
+            pool,
+            init_(nn.Conv2d(in_channels=self.out_channel,
+                            out_channels=self.out_channel,
+                            kernel_size=self.kernel_size,
+                            stride=self.stride)),
             active_func,
-            init_(nn.Conv2d(in_channels=32,
-                            out_channels=64,
-                            kernel_size=3,
-                            stride=1)),
-            active_func,
-            nn.Flatten(),)
+            Flatten(),
+                            )
         with torch.no_grad():
             dummy_ob = torch.ones(1, input_channel, input_width, input_height).float()
             n_flatten = self.cnn(dummy_ob).shape[1] # 6400
