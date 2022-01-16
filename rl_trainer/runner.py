@@ -205,7 +205,7 @@ class Runner:
                         self.self_play_flag = False
                         self.random_play_flag = True
                         self.last_epoch = epoch
-
+                        self.logger.info('load the random agent')
                 elif self.random_play_flag:
                     if ((epoch - self.last_epoch) >= self.randomplay_interval) and record_win[-1000:] > 0.98:
                         p = np.random.rand(1)
@@ -218,13 +218,14 @@ class Runner:
                         else:
                             number = np.random.randint(low_number, median_number) # load the older model 
                             index = self.save_index[number]
-                        state_shape = [1, 25, 25] 
+                        state_shape = [4, 25, 25] 
                         self.opponet = rl_agent(state_shape, self.action_space, self.device) 
                         load_pth = os.path.join(self.load_dir, f'actor_{index}.pth')
                         self.opponet.load_model(load_pth)
                         self.self_play_flag = True
                         self.random_play_flag = False
                         self.last_epoch = epoch
+                        self.logger.info(f"load the actor_{index}")
     
 
     def eval(self, total_step, epoch):
