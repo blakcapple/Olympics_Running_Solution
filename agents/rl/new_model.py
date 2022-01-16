@@ -214,7 +214,7 @@ state_shape = [4, 25, 25]
 action_num = 121
 continue_space = Box(low=np.array([-100, -30]), high=np.array([200, 30]))   
 discrete_space = Discrete(action_num)
-load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_1650.pth"
+load_pth = os.path.dirname(os.path.abspath(__file__)) + "/actor_2150.pth"
 agent = RLAgent(state_shape, discrete_space)
 agent.load_model(load_pth)
 # agent.save_model(load_pth)
