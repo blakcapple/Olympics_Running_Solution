@@ -18,6 +18,7 @@ class Runner:
         self.total_epoch_step = args.epoch_step
         self.n_rollout = args.cpu
         self.load_index = args.load_index
+        self.load_opponent_index = args.load_opponent_index
         self.local_steps_per_epoch = int(self.total_epoch_step / args.cpu)
         self.eval_step = args.eval_step
         self.randomplay_epoch = args.randomplay_epoch
@@ -123,9 +124,9 @@ class Runner:
         obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
-            o = self.env.reset()
-            obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
-            obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
+            # o = self.env.reset()
+            # obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
+            # obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
             if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
                 self.begin_self_play = True
                 self.self_play_flag = True
@@ -177,7 +178,7 @@ class Runner:
                             record_win_op.append(win_is_op)
                             epoch_reward.append(ep_rets[index])
                             # only save EpRet / EpLen if trajectory finished
-                        ep_rets[index], ep_lens[index] = 0, 0
+                            ep_rets[index], ep_lens[index] = 0, 0
             
             # update policy
             self.policy.learn(epoch)
@@ -198,36 +199,37 @@ class Runner:
                 obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
                 
             if self.begin_self_play and epoch > 0:
-    
+
                 if self.self_play_flag:
-                    if ((epoch - self.last_epoch) >= self.selfplay_interval and np.mean(record_win[-1000:]) > 0.9) or (epoch - self.last_epoch) > 500:
+
+                    # update rl opponent agent if satisfying the winr requirements
+                    if (epoch - self.last_epoch) > 20 and np.mean(record_win[-1000:]) > 0.91:
+                        self.load_opponent_index += 2 * self.save_interval # use newer model (newer always better) as opponent 
+                        if self.load_opponent_index not in self.save_index:
+                            self.load_opponent_index = self.save_index[int(self.load_opponent_index / self.save_interval)]
+                        load_pth = os.path.join(self.load_dir, f'actor_{self.load_opponent_index}.pth')
+                        self.opponet.load_model(load_pth)
+
+                    # load random agent at fix interval 
+                    if (epoch - self.last_epoch) == self.selfplay_interval:
                         self.opponet = random_agent(self.action_space) # give agent a break
                         self.self_play_flag = False
                         self.random_play_flag = True
                         self.last_epoch = epoch
                         self.logger.info('load the random agent')
+
                 elif self.random_play_flag:
-                    if ((epoch - self.last_epoch) >= self.randomplay_interval) and record_win[-1000:] > 0.98:
-                        p = np.random.rand(1)
-                        low_number = max((len(self.save_index) - 60), 0) # the oldest model to self-play
-                        median_number = max((len(self.save_index) - 40), 1)
-                        high_number = max((len(self.save_index) - 20), 2) # the newest model to self-play
-                        if p > 0.8:
-                            number = np.random.randint(median_number, high_number)
-                            index = self.save_index[number]  # load the newer model 
-                        else:
-                            number = np.random.randint(low_number, median_number) # load the older model 
-                            index = self.save_index[number]
+                    # load the rl agent after playing with random agent 
+                    if ((epoch - self.last_epoch) >= self.randomplay_interval) and np.mean(record_win[-1000:]) > 0.99:
                         state_shape = [4, 25, 25] 
                         self.opponet = rl_agent(state_shape, self.action_space, self.device) 
-                        load_pth = os.path.join(self.load_dir, f'actor_{index}.pth')
+                        load_pth = os.path.join(self.load_dir, f'actor_{self.load_opponent_index}.pth')
                         self.opponet.load_model(load_pth)
                         self.self_play_flag = True
                         self.random_play_flag = False
                         self.last_epoch = epoch
-                        self.logger.info(f"load the actor_{index}")
+                        self.logger.info(f"load the actor_{self.load_opponent_index}")
     
-
     def eval(self, total_step, epoch):
         """
         evaluate the performence of agent 
