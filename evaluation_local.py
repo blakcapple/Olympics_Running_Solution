@@ -58,65 +58,70 @@ def get_join_actions(state, algo_list):
 RENDER = True
 
 def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
-    total_reward = np.zeros(2)
-    num_win = np.zeros(3)       #agent 1 win, agent 2 win, draw
-    episode = int(episode)
-    for i in range(1, int(episode)+1):
-        game.specify_a_map(i)
-        shuffle_map =False
-        episode_reward = np.zeros(2)
+    for i in range(2):
+        if i == 1:
+            agent_list.reverse()
+        total_reward = np.zeros(2)
+        num_win = np.zeros(3)       #agent 1 win, agent 2 win, draw
+        episode = int(episode)
+        for i in range(1, int(episode)+1):
+            game.specify_a_map(i)
+            shuffle_map =False
+            episode_reward = np.zeros(2)
 
-        state = env.reset(shuffle_map)
-        obs_sequence = None
-        if RENDER:
-            env.env_core.render()
-
-        step = 0
-
-        while True:
-            joint_action = get_join_actions(state, algo_list)
-            next_state, reward, done, _, info = env.step(joint_action)
-            reward = np.array(reward)
-            episode_reward += reward
+            state = env.reset(shuffle_map)
+            obs_sequence = None
             if RENDER:
                 env.env_core.render()
 
-            if done:
-                agent.obs_sequence = None
-                if reward[0] != reward[1]:
-                    if reward[0]==100:
-                        num_win[0] +=1
-                    elif reward[1] == 100:
-                        num_win[1] += 1
+            step = 0
+
+            while True:
+                joint_action = get_join_actions(state, algo_list)
+                next_state, reward, done, _, info = env.step(joint_action)
+                if not done:
+                    reward = [-1, -1]
+                reward = np.array(reward)
+                episode_reward += reward
+                if RENDER:
+                    env.env_core.render()
+
+                if done:
+                    agent.obs_sequence = None
+                    if reward[0] != reward[1]:
+                        if reward[0]==100:
+                            num_win[0] +=1
+                        elif reward[1] == 100:
+                            num_win[1] += 1
+                        else:
+                            raise NotImplementedError
                     else:
-                        raise NotImplementedError
-                else:
-                    num_win[2] += 1
+                        num_win[2] += 1
 
-                if not verbose:
-                    print('.', end='')
-                    if i % 100 == 0 or i==episode:
-                        print()
-                break
-            state = next_state
-            step += 1
-        total_reward += episode_reward
-    total_reward/=episode
-    print("total reward: ", total_reward)
-    print('Result in map {} within {} episode:'.format(map_num, episode))
-    #print(f'\nResult in base on {episode} in map {map_num} ', end='')
+                    if not verbose:
+                        print('.', end='')
+                        if i % 100 == 0 or i==episode:
+                            print()
+                    break
+                state = next_state
+                step += 1
+            total_reward += episode_reward
+        total_reward/=episode
+        print("total reward: ", total_reward)
+        print('Result in map {} within {} episode:'.format(map_num, episode))
+        #print(f'\nResult in base on {episode} in map {map_num} ', end='')
 
-    header = ['Name', algo_list[0], algo_list[1]]
-    data = [['score', np.round(total_reward[0], 2), np.round(total_reward[1], 2)],
-            ['win', num_win[0], num_win[1]]]
-    print(tabulate(data, headers=header, tablefmt='pretty'))
+        header = ['Name', algo_list[0], algo_list[1]]
+        data = [['score', np.round(total_reward[0], 2), np.round(total_reward[1], 2)],
+                ['win', num_win[0], num_win[1]]]
+        print(tabulate(data, headers=header, tablefmt='pretty'))
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--my_ai", default='rl', help='rl/random')
-    parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
+    parser.add_argument("--opponent", default='random', help='rl_base/random')
     parser.add_argument("--episode", default=10)
     parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()
@@ -136,6 +141,6 @@ if __name__ == "__main__":
     random.seed(seed)
     
     agent_list = [args.opponent, args.my_ai]        #your are controlling agent green
-    agent_list = [args.my_ai, args.opponent]
+    # agent_list = [args.my_ai, args.opponent]
     run_game(game, algo_list=agent_list, episode=args.episode, shuffle_map=shuffle,map_num=args.map,verbose=False)
 
