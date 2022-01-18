@@ -11,6 +11,7 @@ from gym.spaces import Box, Discrete
 import re
 from torch.distributions import Categorical
 
+
 class Runner:
 
     def __init__(self, args, env, policy, opponent, buffer, logger, device, 
@@ -66,7 +67,7 @@ class Runner:
             if len(index) > 0 :
                 self.save_index.append(int(index[0]))
         self.save_index.sort() # from low to high sorting
-        self.model_score = torch.ones(size=(len(self.save_index)), dtype=torch.float64) # initialize scores 
+        self.model_score = torch.ones(len(self.save_index), dtype=torch.float64) # initialize scores 
         self.logger.info(f'model_score: {self.model_score}')
 
     def _set_actions_map(self, action_num):
@@ -147,10 +148,10 @@ class Runner:
                 else:
                     sample_distribution = Categorical(logits=self.model_score)
                     opponent_number = sample_distribution.sample()
-                    load_path = os.path.join(self.load_dir, f'actor_{self.save_index[opponent_number]}.pth')
+                load_path = os.path.join(self.load_dir, f'actor_{self.save_index[opponent_number]}.pth')
                 opponent = rl_agent([4, 25, 25], self.action_space, self.device)
                 opponent.load_model(load_path)
-                self.logger.info('load actor_{self.save_index[opponent_number]} as opponent')
+                self.logger.info(f'load actor_{self.save_index[opponent_number]} as opponent')
 
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
@@ -206,18 +207,19 @@ class Runner:
             mean_win = np.mean(epoch_winr)
             # if mean_win bigger than 0.5, subtract the opoonent score
             if mean_win >= 0.5:
-                self.model_score[opponent_number] -= 0.01 / (len(self.save_index) * sample_distribution.probs[opponent_number])
+                self.model_score[opponent_number] -= 0.01 / (len(self.save_index) * sample_distribution.probs[opponent_number]) * (mean_win-0.5)
+            self.logger.info(f'model_score: {self.model_score}')
             
             # update policy
             self.policy.learn(epoch)
             # Log info about epoch
             wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)}, step=epoch)
-            self.logger.info(f'epoch:{epoch}, WinR:{np.mean(mean_win)}, Reward:, {np.mean(epoch_reward)}, time:{time.time() - start_time}')
-            if epoch % self.save_interval == 0 or epoch == (epochs-1):
+            self.logger.info(f'epoch:{epoch}, WinR:{mean_win}, Reward:, {np.mean(epoch_reward)}, time:{time.time() - start_time}')
+            if epoch % self.save_interval == 0 or epoch == (epochs-1) and epoch > 0:
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
                 # append the max score along the model score list 
-                self.model_score = torch.cat(self.model_score, torch.tensor([1], dtype=torch.float64)) 
+                self.model_score = torch.cat((self.model_score, torch.tensor([1])))
 
             # eval the agent(assume the opponent is static)
             if epoch % self.eval_interval == 0 or epoch == (epochs-1):
