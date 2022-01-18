@@ -37,11 +37,11 @@ class Runner:
         self.device = device
         self.action_space = action_space
         self.act_dim = act_dim
-        self.opponet = opponent
+        self.opponent = opponent
         self.load_dir = os.path.join(args.save_dir, 'models') # where to load models for opponent
         self.save_index = [] # the models pool
         self.model_score = [] # the score of the historical models (used to sample)
-        if isinstance(self.opponet, rl_agent):
+        if isinstance(self.opponent, rl_agent):
             self.random_play_flag = False
             self.self_play_flag = True  
         else:
@@ -149,13 +149,13 @@ class Runner:
                     sample_distribution = Categorical(logits=self.model_score)
                     opponent_number = sample_distribution.sample()
                 load_path = os.path.join(self.load_dir, f'actor_{self.save_index[opponent_number]}.pth')
-                opponent = rl_agent([4, 25, 25], self.action_space, self.device)
-                opponent.load_model(load_path)
+                self.opponent = rl_agent([4, 25, 25], self.action_space, self.device)
+                self.opponent.load_model(load_path)
                 self.logger.info(f'load actor_{self.save_index[opponent_number]} as opponent')
 
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
-                action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
+                action_opponent = self.opponent.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
                 env_a = self._wrapped_action(a, action_opponent)
                 next_o, r, d, info = self.env.step(env_a)
                 for i, done in enumerate(d):
