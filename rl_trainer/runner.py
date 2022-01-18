@@ -9,6 +9,7 @@ import wandb
 from copy import deepcopy
 from gym.spaces import Box, Discrete
 import re
+from torch.distributions import Categorical
 
 class Runner:
 
@@ -37,7 +38,8 @@ class Runner:
         self.act_dim = act_dim
         self.opponet = opponent
         self.load_dir = os.path.join(args.save_dir, 'models') # where to load models for opponent
-        self.save_index = []
+        self.save_index = [] # the models pool
+        self.model_score = [] # the score of the historical models (used to sample)
         if isinstance(self.opponet, rl_agent):
             self.random_play_flag = False
             self.self_play_flag = True  
@@ -64,6 +66,8 @@ class Runner:
             if len(index) > 0 :
                 self.save_index.append(int(index[0]))
         self.save_index.sort() # from low to high sorting
+        self.model_score = torch.ones(size=(len(self.save_index)), dtype=torch.float64) # initialize scores 
+        self.logger.info(f'model_score: {self.model_score}')
 
     def _set_actions_map(self, action_num):
         #dicretise action space
@@ -124,13 +128,30 @@ class Runner:
         obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
     # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
-            # o = self.env.reset()
-            # obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
-            # obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
+            o = self.env.reset()
+            epoch_winr = []
+            epoch_reward = []
+            obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
+            obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
             if (self.load_index+epoch) > self.randomplay_epoch and not self.begin_self_play:
                 self.begin_self_play = True
                 self.self_play_flag = True
                 self.last_epoch = 0
+
+            if self.begin_self_play:
+                
+                # with 0.2 probability sample the lateset model and 0.8 probability sample historical model 
+                p = np.random.rand(1)
+                if p > 0.8:
+                    opponent_number = -1                    
+                else:
+                    sample_distribution = Categorical(logits=self.model_score)
+                    opponent_number = sample_distribution.sample()
+                    load_path = os.path.join(self.load_dir, f'actor_{self.save_index[opponent_number]}.pth')
+                opponent = rl_agent([4, 25, 25], self.action_space, self.device)
+                opponent.load_model(load_path)
+                self.logger.info('load actor_{self.save_index[opponent_number]} as opponent')
+
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
                 action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
@@ -174,21 +195,29 @@ class Runner:
                             episode +=1
                             win_is = 1 if r[index][0] > r[index][1] else 0
                             win_is_op = 1 if r[index][0] < r[index][1] else 0
+                            epoch_winr.append(win_is)
                             record_win.append(win_is)
                             record_win_op.append(win_is_op)
                             epoch_reward.append(ep_rets[index])
                             # only save EpRet / EpLen if trajectory finished
                             ep_rets[index], ep_lens[index] = 0, 0
             
+            # update opponent score
+            mean_win = np.mean(epoch_winr)
+            # if mean_win bigger than 0.5, subtract the opoonent score
+            if mean_win >= 0.5:
+                self.model_score[opponent_number] -= 0.01 / (len(self.save_index) * sample_distribution.probs[opponent_number])
+            
             # update policy
             self.policy.learn(epoch)
             # Log info about epoch
             wandb.log({'WinR':np.mean(record_win[-100:]), 'Reward':np.mean(epoch_reward)}, step=epoch)
-            epoch_reward = []
-            self.logger.info(f'epoch:{epoch}, WinR:{np.mean(record_win[-100:])}, LoseR:, {np.mean(record_win_op[-100:])}, time:{time.time() - start_time}')
+            self.logger.info(f'epoch:{epoch}, WinR:{np.mean(mean_win)}, Reward:, {np.mean(epoch_reward)}, time:{time.time() - start_time}')
             if epoch % self.save_interval == 0 or epoch == (epochs-1):
                 self.policy.save_models(self.load_index+epoch)
                 self.save_index.append(self.load_index+epoch)
+                # append the max score along the model score list 
+                self.model_score = torch.cat(self.model_score, torch.tensor([1], dtype=torch.float64)) 
 
             # eval the agent(assume the opponent is static)
             if epoch % self.eval_interval == 0 or epoch == (epochs-1):
@@ -197,39 +226,8 @@ class Runner:
                 o = self.env.reset()
                 obs_ctrl_agent = o['0'].reshape(self.n_rollout, 4, 25, 25)
                 obs_oppo_agent = o['1'].reshape(self.n_rollout, 4, 25, 25)
-                
-            if self.begin_self_play and epoch > 0:
 
-                if self.self_play_flag:
 
-                    # update rl opponent agent if satisfying the winr requirements
-                    if (epoch - self.last_epoch) > 20 and np.mean(record_win[-1000:]) > 0.91:
-                        self.load_opponent_index += 2 * self.save_interval # use newer model (newer always better) as opponent 
-                        if self.load_opponent_index not in self.save_index:
-                            self.load_opponent_index = self.save_index[int(self.load_opponent_index / self.save_interval)]
-                        load_pth = os.path.join(self.load_dir, f'actor_{self.load_opponent_index}.pth')
-                        self.opponet.load_model(load_pth)
-
-                    # load random agent at fix interval 
-                    if (epoch - self.last_epoch) == self.selfplay_interval:
-                        self.opponet = random_agent(self.action_space) # give agent a break
-                        self.self_play_flag = False
-                        self.random_play_flag = True
-                        self.last_epoch = epoch
-                        self.logger.info('load the random agent')
-
-                elif self.random_play_flag:
-                    # load the rl agent after playing with random agent 
-                    if ((epoch - self.last_epoch) >= self.randomplay_interval) and np.mean(record_win[-1000:]) > 0.99:
-                        state_shape = [4, 25, 25] 
-                        self.opponet = rl_agent(state_shape, self.action_space, self.device) 
-                        load_pth = os.path.join(self.load_dir, f'actor_{self.load_opponent_index}.pth')
-                        self.opponet.load_model(load_pth)
-                        self.self_play_flag = True
-                        self.random_play_flag = False
-                        self.last_epoch = epoch
-                        self.logger.info(f"load the actor_{self.load_opponent_index}")
-    
     def eval(self, total_step, epoch):
         """
         evaluate the performence of agent 
