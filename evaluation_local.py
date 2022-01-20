@@ -3,7 +3,8 @@ import numpy as np
 import torch
 import random
 from agents.rl.new_model import agent
-from agents.rl.old_model import agent as agent_base
+from agents.rl.new_model import agent_base 
+# from agents.rl.old_model import agent as agent_base
 from env.chooseenv import make
 from tabulate import tabulate
 import argparse
@@ -19,6 +20,8 @@ def get_join_actions(state, algo_list):
         if algo_list[agent_idx] == 'random':
             driving_force = random.uniform(-100, 200)
             turing_angle = random.uniform(-30, 30)
+            driving_force = 0 
+            turing_angle = 0
             joint_actions.append([[driving_force], [turing_angle]])
 
         elif algo_list[agent_idx] == 'rl_base':
@@ -46,6 +49,7 @@ def get_join_actions(state, algo_list):
                 actions = low + 0.5*(action + 1.0)*(high - low)
             else:
                 actions = agent.actions_map[actions_raw.item()]
+                # print(actions)
             joint_actions.append([[actions[0]], [actions[1]]])
 
     return joint_actions
@@ -88,6 +92,7 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
 
                 if done:
                     agent.obs_sequence = None
+                    agent_base.obs_sequence = None
                     if reward[0] != reward[1]:
                         if reward[0]==100:
                             num_win[0] +=1
@@ -120,8 +125,8 @@ def run_game(env, algo_list, episode, shuffle_map,map_num, verbose=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--my_ai", default='rl', help='rl/random')
-    parser.add_argument("--opponent", default='random', help='rl_base/random')
+    parser.add_argument("--my_ai", default='random', help='rl/random')
+    parser.add_argument("--opponent", default='rl_base', help='rl_base/random')
     parser.add_argument("--episode", default=10)
     parser.add_argument("--map", default='all', help='1/2/3/4/all')
     args = parser.parse_args()

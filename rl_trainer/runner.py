@@ -10,7 +10,7 @@ from copy import deepcopy
 from gym.spaces import Box, Discrete
 import re
 from torch.distributions import Categorical
-
+import pdb
 
 class Runner:
 
@@ -37,11 +37,11 @@ class Runner:
         self.device = device
         self.action_space = action_space
         self.act_dim = act_dim
-        self.opponent = opponent
+        self.opponet = opponent
         self.load_dir = os.path.join(args.save_dir, 'models') # where to load models for opponent
         self.save_index = [] # the models pool
         self.model_score = [] # the score of the historical models (used to sample)
-        if isinstance(self.opponent, rl_agent):
+        if isinstance(self.opponet, rl_agent):
             self.random_play_flag = False
             self.self_play_flag = True  
         else:
@@ -81,6 +81,7 @@ class Runner:
     def _wrapped_action(self, actions, opponent_actions):
         
         wrapped_actions = []
+        index = 1
         for action, opponent_action in zip(actions, opponent_actions):
             if isinstance(self.action_space, Discrete):
                 real_action = self.actions_map[action]
@@ -95,6 +96,7 @@ class Runner:
             wrapped_action = [[real_action[0]], [real_action[1]]]
             wrapped_opponent_action = [[real_opponent_action[0]], [real_opponent_action[1]]]
             wrapped_actions.append([wrapped_action, wrapped_opponent_action])
+            index += 1
 
         return wrapped_actions
 
@@ -149,13 +151,13 @@ class Runner:
                     sample_distribution = Categorical(logits=self.model_score)
                     opponent_number = sample_distribution.sample()
                 load_path = os.path.join(self.load_dir, f'actor_{self.save_index[opponent_number]}.pth')
-                self.opponent = rl_agent([4, 25, 25], self.action_space, self.device)
-                self.opponent.load_model(load_path)
+                self.opponet = rl_agent([4, 25, 25], self.action_space, self.device)
+                self.opponet.load_model(load_path)
                 self.logger.info(f'load actor_{self.save_index[opponent_number]} as opponent')
 
             for t in range(self.local_steps_per_epoch):
                 a, v, logp = self.policy.step(torch.as_tensor(obs_ctrl_agent, dtype=torch.float32, device=self.device))
-                action_opponent = self.opponent.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
+                action_opponent = self.opponet.act(torch.as_tensor(obs_oppo_agent, dtype=torch.float32, device=self.device))
                 env_a = self._wrapped_action(a, action_opponent)
                 next_o, r, d, info = self.env.step(env_a)
                 for i, done in enumerate(d):
@@ -201,7 +203,7 @@ class Runner:
                             record_win_op.append(win_is_op)
                             epoch_reward.append(ep_rets[index])
                             # only save EpRet / EpLen if trajectory finished
-                            ep_rets[index], ep_lens[index] = 0, 0
+                        ep_rets[index], ep_lens[index] = 0, 0
             
             # update opponent score
             mean_win = np.mean(epoch_winr)
@@ -220,6 +222,7 @@ class Runner:
                 self.save_index.append(self.load_index+epoch)
                 # append the max score along the model score list 
                 self.model_score = torch.cat((self.model_score, torch.tensor([1])))
+                assert self.model_score.shape[0] == len(self.save_index), self.logger.info('check model score !')
 
             # eval the agent(assume the opponent is static)
             if epoch % self.eval_interval == 0 or epoch == (epochs-1):
